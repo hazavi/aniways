@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from app.core.config import settings
+from app.scrapers.animepahe.errors import AnimepaheAccessError
 from app.utils.matching import best_match
 
 if TYPE_CHECKING:
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 async def search(scraper: "AnimepaheScraper", query: str) -> list[dict]:
     """Search anime on Animepahe."""
     try:
-        resp = await scraper._request(f"{settings.animepahe_api}?m=search&q={query}")
+        resp = await scraper._request(settings.animepahe_api, params={"m": "search", "q": query})
         resp.raise_for_status()
 
         return [
@@ -35,6 +36,8 @@ async def search(scraper: "AnimepaheScraper", query: str) -> list[dict]:
             }
             for d in resp.json().get("data", [])
         ]
+    except AnimepaheAccessError:
+        raise
     except Exception as e:
         logger.error("Search error: %s", e)
         return []

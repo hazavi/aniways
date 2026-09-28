@@ -332,6 +332,8 @@ export default function WatchPage({ params }: WatchPageProps) {
       const errorMsg = err instanceof Error ? err.message : "";
       if (errorMsg.includes("404")) {
         setError("not_found");
+      } else if (errorMsg.includes("503")) {
+        setError("blocked");
       } else {
         setError("retry");
       }
@@ -595,9 +597,15 @@ export default function WatchPage({ params }: WatchPageProps) {
                 </Link>
               </div>
             ) : error ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-4">
+                {error === "blocked" && (
+                  <p className="text-muted-foreground text-center">
+                    AnimePahe is blocking stream lookup. Refresh its access cookies, then retry.
+                  </p>
+                )}
                 <button
                   onClick={handleRetry}
+                  aria-label="Retry stream lookup"
                   className="group flex items-center justify-center w-20 h-20 rounded-full bg-primary/90 hover:bg-primary transition-all hover:scale-110"
                 >
                   <Play className="h-10 w-10 text-primary-foreground ml-1" />

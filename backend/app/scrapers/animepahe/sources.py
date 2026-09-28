@@ -4,21 +4,17 @@ Animepahe Video Sources
 """
 
 import logging
-import re
 from typing import TYPE_CHECKING
 
+from bs4 import BeautifulSoup
+
 from app.core.config import settings
+from app.scrapers.animepahe.errors import AnimepaheAccessError
 
 if TYPE_CHECKING:
     from app.scrapers.animepahe.client import AnimepaheScraper
 
 logger = logging.getLogger(__name__)
-
-_SOURCE_PATTERN = re.compile(
-    r'data-src="([^"]+)"[^>]*data-fansub="([^"]*)"[^>]*data-resolution="(\d+)"[^>]*data-audio="([^"]*)"[^>]*data-av1="([^"]*)"',
-    re.I,
-)
-
 
 async def get_sources(scraper: "AnimepaheScraper", uuid: str, session: str) -> dict:
     """Get video sources for an episode."""
@@ -26,31 +22,38 @@ async def get_sources(scraper: "AnimepaheScraper", uuid: str, session: str) -> d
         resp = await scraper._request(f"{settings.ANIMEPAHE_BASE_URL}/play/{uuid}/{session}")
         resp.raise_for_status()
 
-        sources = sorted(
-            [
-                {
-                    "embed_url": u,
-                    "fansub": f,
-                    "resolution": int(r),
-                    "quality": f"{r}p",
-                    "audio": a,
-                    "av1": v == "1",
-                }
-                for u, f, r, a, v in _SOURCE_PATTERN.findall(resp.text)
-            ],
-            key=lambda x: x["resolution"],
-            reverse=True,
-        )
+        sources = parse_sources(resp.text)
 
         return {"sources": sources, "episode_url": str(resp.url)}
+    except AnimepaheAccessError:
+        raise
     except Exception as e:
         logger.error("Sources error: %s", e)
         return {"sources": []}
 
 
+def parse_sources(html: str) -> list[dict]:
+    """Read player options regardless of HTML attribute order or quote style."""
+    sources = []
+    for option in BeautifulSoup(html, "html.parser").select("[data-src][data-resolution]"):
+        url = option.get("data-src", "")
+        resolution = option.get("data-resolution", "")
+        if not url.startswith(("https://", "http://")) or not resolution.isdigit():
+            continue
+        sources.append({
+            "embed_url": url,
+            "fansub": option.get("data-fansub", ""),
+            "resolution": int(resolution),
+            "quality": f"{resolution}p",
+            "audio": option.get("data-audio", ""),
+            "av1": option.get("data-av1", "0") == "1",
+        })
+    return sorted(sources, key=lambda source: source["resolution"], reverse=True)
+
+
 async def get_video_url(scraper: "AnimepaheScraper", mal_id: int, episode: int, quality: str = "1080") -> dict:
     """Complete flow: MAL ID -> video URL."""
-    from app.scrapers.jikan import scrape_anime_details
+    from app.scrapers.mal import scrape_anime_details
     from app.scrapers.animepahe.search import search, find_best_match
     from app.scrapers.animepahe.episodes import find_episode
 

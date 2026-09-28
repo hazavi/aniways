@@ -5,9 +5,14 @@ Animepahe Latest Releases
 
 import asyncio
 import logging
+import re
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
+from bs4 import BeautifulSoup
+
 from app.core.config import settings
+from app.scrapers.animepahe.errors import AnimepaheAccessError
 from app.utils.matching import similarity
 
 if TYPE_CHECKING:
@@ -22,14 +27,12 @@ _mal_cache: dict[str, tuple] = {}
 async def get_latest_releases(scraper: "AnimepaheScraper", page: int = 1, limit: int = 12) -> dict:
     """Get latest episode releases with MAL IDs."""
     try:
-        resp = await scraper._request(f"{settings.animepahe_api}?m=airing&page={page}")
+        resp = await scraper._request(f"{settings.ANIMEPAHE_BASE_URL}/?page={page}")
         resp.raise_for_status()
-        data = resp.json()
-
-        items = data.get("data", [])[:limit]
+        soup = BeautifulSoup(resp.text, "html.parser")
+        items = _parse_latest_releases(soup)[:limit]
         releases = []
 
-        # Process in batches of 4
         for i in range(0, len(items), 4):
             batch = items[i : i + 4]
             results = await asyncio.gather(*[_resolve_mal(item) for item in batch])
@@ -39,14 +42,56 @@ async def get_latest_releases(scraper: "AnimepaheScraper", page: int = 1, limit:
                 await asyncio.sleep(0.5)
 
         return {
-            "total": data.get("total", 0),
-            "current_page": data.get("current_page", 1),
-            "last_page": data.get("last_page", 1),
+            "total": len(items),
+            "current_page": page,
+            "last_page": _last_page(soup),
             "data": releases,
         }
+    except AnimepaheAccessError:
+        raise
     except Exception as e:
         logger.error("Latest releases error: %s", e)
         return {"total": 0, "current_page": 1, "last_page": 1, "data": []}
+
+
+def _parse_latest_releases(soup: BeautifulSoup) -> list[dict]:
+    """Extract latest-release cards from Animepahe's rendered home page."""
+    releases = []
+    for card in soup.select(".latest-release .episode-wrap"):
+        anime_link = card.select_one('.episode-title a[href^="/anime/"]')
+        play_link = card.select_one('a.play[href^="/play/"]')
+        snapshot = card.select_one(".episode-snapshot img")
+        if not anime_link or not play_link:
+            continue
+
+        parts = play_link["href"].strip("/").split("/")
+        if len(parts) != 3 or parts[0] != "play":
+            continue
+
+        episode_match = re.search(r"Episode\s+(\d+)", play_link.get_text(" ", strip=True))
+        if not episode_match:
+            continue
+
+        releases.append({
+            "anime_title": anime_link.get("title") or anime_link.get_text(" ", strip=True),
+            "anime_session": parts[1],
+            "session": parts[2],
+            "episode": int(episode_match.group(1)),
+            "snapshot": snapshot.get("src") if snapshot else None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    return releases
+
+
+def _last_page(soup: BeautifulSoup) -> int:
+    """Read the final page number from Animepahe's pager."""
+    last_page = 1
+    for link in soup.select(".pagination a[data-page]"):
+        try:
+            last_page = max(last_page, int(link["data-page"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return last_page
 
 
 async def _resolve_mal(item: dict) -> dict:
@@ -58,7 +103,7 @@ async def _resolve_mal(item: dict) -> dict:
         "anime_title": title,
         "anime_uuid": item.get("anime_session"),
         "episode": item.get("episode"),
-        "poster": poster,
+        "poster": poster or item.get("snapshot"),
         "fansub": item.get("fansub"),
         "created_at": item.get("created_at"),
         "mal_id": mal_id,
@@ -70,7 +115,7 @@ async def _resolve_mal(item: dict) -> dict:
 
 async def _search_mal(title: str) -> tuple[Optional[int], Optional[str], Optional[str], Optional[str]]:
     """Search MAL for anime info (cached)."""
-    from app.scrapers.jikan import search_anime
+    from app.scrapers.mal import search_anime
 
     key = title.lower().strip()
     if key in _mal_cache:

@@ -1,13 +1,13 @@
 # Aniways Backend
 
-A FastAPI-based backend for anime streaming, providing data from MyAnimeList (via Jikan API) and video sources from Animepahe.
+A FastAPI-based backend for anime streaming, providing data from the official MyAnimeList v2 API and video sources from Animepahe.
 
 ## Features
 
 - **User Authentication** - JWT-based auth with 30-day token expiry
 - **Anime Lists** - Track anime with status (Plan to Watch, Watching, Completed, Paused, Dropped)
 - **SQLite Database** - Persistent storage with SQLAlchemy ORM
-- **MyAnimeList Integration** - Anime metadata, search, seasons, schedule via Jikan API
+- **MyAnimeList Integration** - Anime metadata, search, rankings, seasons, and schedules via MAL v2
 - **Animepahe Scraper** - Video source extraction with DDoS-Guard bypass
 - **Kwik Extractor** - Decodes obfuscated video URLs from kwik.cx
 - **Caching** - In-memory TTL cache to reduce API calls
@@ -63,11 +63,11 @@ Configuration is managed via environment variables with sensible defaults:
 | `HOST`               | `0.0.0.0`                  | Server bind host                           |
 | `PORT`               | `8000`                     | Server bind port                           |
 | `API_TITLE`          | `Aniways API`              | API title in docs                          |
-| `JIKAN_BASE_URL`     | `https://api.jikan.moe/v4` | Jikan API base URL                         |
+| `MAL_CLIENT_ID`      | -                          | Required MyAnimeList v2 client ID           |
+| `MAL_BASE_URL`       | `https://api.myanimelist.net/v2` | MyAnimeList API base URL               |
 | `ANIMEPAHE_BASE_URL` | `https://animepahe.pw`     | Animepahe base URL                         |
 | `CACHE_TTL_LIST`     | `300`                      | Cache TTL for list endpoints (seconds)     |
 | `CACHE_TTL_DETAIL`   | `3600`                     | Cache TTL for detail endpoints (seconds)   |
-| `JIKAN_RATE_LIMIT`   | `0.35`                     | Min delay between Jikan requests (seconds) |
 | `DATA_DIR`           | `backend/` or `/app/data`  | Directory for SQLite database              |
 | `SECRET_KEY`         | (auto-generated)           | JWT signing key (set in production!)       |
 
@@ -88,7 +88,7 @@ backend/
 │   ├── extractors/        # Video URL extractors
 │   │   └── kwik.py        # Kwik.cx video extractor
 │   ├── scrapers/          # Site-specific scrapers
-│   │   ├── jikan.py       # Jikan API wrapper (MAL data)
+│   │   ├── mal.py         # Official MyAnimeList v2 client
 │   │   └── animepahe/     # Animepahe scraper
 │   │       ├── client.py  # Main scraper class
 │   │       ├── search.py  # Search functionality
@@ -104,7 +104,7 @@ backend/
 │   └── routes/            # API endpoints
 │       ├── auth.py        # Register, login, user info
 │       ├── animelist.py   # Anime list management
-│       ├── mal.py         # MyAnimeList/Jikan routes
+│       ├── mal.py         # MyAnimeList routes
 │       ├── animepahe.py   # Animepahe routes
 │       └── watch.py       # Watch/video source routes
 ```
@@ -346,7 +346,7 @@ GET /api/watch/{mal_id}/{episode}?quality=1080
 | `episode` | -       | Episode number                          |
 | `quality` | `1080`  | Preferred quality (1080, 720, 480, 360) |
 
-Returns video sources for a specific episode, automatically matching MAL to Animepahe.
+Returns video sources for a specific episode. It tries Animepahe first, then uses an AnimeX FlixCloud embed when Animepahe is blocked or has no source. AnimeX lookup maps the MAL ID through AniList.
 
 #### All Episode Sources
 
@@ -368,10 +368,12 @@ Returns Animepahe match info for a MAL ID (uuid, title match, episode count).
 
 Animepahe uses DDoS-Guard protection. To access it, you need to provide valid cookies:
 
-1. Visit [animepahe.si](https://animepahe.si) in your browser
+If Animepahe responds with a Cloudflare 403 challenge, stream lookup returns HTTP 503. A 503 means the provider blocked the backend request; it does not mean the anime or episode is missing. The backend uses a Chrome-like TLS client, but it still needs fresh access cookies from a browser session that has passed the challenge. Add all Animepahe cookies, including `cf_clearance` if present, to `ANIMEPAHE_COOKIES` in `backend/.env`, restart the backend, and retry. Do not paste these cookies into an issue or chat.
+
+1. Visit [animepahe.pw](https://animepahe.pw) in your browser
 2. Open DevTools (F12) → Application → Cookies
-3. Copy all cookie values
-4. POST them to `/api/animepahe/cookies`:
+3. Enter the required cookie values as a JSON object in `ANIMEPAHE_COOKIES` in `backend/.env`.
+4. Restart the backend. You can also POST cookies to `/api/animepahe/cookies` for the current backend session:
 
 ```bash
 curl -X POST http://localhost:8000/api/animepahe/cookies \
@@ -381,9 +383,21 @@ curl -X POST http://localhost:8000/api/animepahe/cookies \
 
 Cookies typically need to be refreshed periodically (every few hours).
 
+## MyAnimeList API Setup
+
+Create an API client at MyAnimeList, then set its client ID before starting the backend. Catalogue endpoints use the `X-MAL-CLIENT-ID` header, so no user access token is required.
+
+Create `backend/.env` from `backend/.env.example`, then replace its `MAL_CLIENT_ID` value with your registered client ID. The `.env` file is ignored by Git and is loaded automatically when the backend starts.
+
+```powershell
+python server.py
+```
+
+MAL v2 does not expose public anime-character or per-episode-title endpoints. Those responses remain available in the API shape but contain no character or episode-title data.
+
 ## Rate Limiting
 
-- **Jikan API**: Max 3 requests/second (configurable via `JIKAN_RATE_LIMIT`)
+- **MyAnimeList API**: Uses the registered application's client ID for catalogue requests
 - **Animepahe**: Batch processing with 500ms delays between batches
 
 ## Caching

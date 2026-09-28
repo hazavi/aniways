@@ -5,9 +5,15 @@ Application Configuration
 Centralized settings with environment variable support.
 """
 
+import json
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 # Environment helpers
 _env = os.getenv
@@ -27,15 +33,12 @@ class Settings:
     # API Info
     API_TITLE: str = "Aniways API"
     API_VERSION: str = "2.0.0"
-    API_DESCRIPTION: str = "Anime streaming API - Jikan (MAL) + Animepahe"
+    API_DESCRIPTION: str = "Anime streaming API - MyAnimeList v2 + Animepahe"
 
     # External URLs
-    JIKAN_BASE_URL: str = "https://api.jikan.moe/v4"
-    ANIMEPAHE_BASE_URL: str = "https://animepahe.pw"
-
-    # Rate Limiting & Retries
-    JIKAN_RATE_LIMIT_DELAY: float = 0.4
-    JIKAN_MAX_RETRIES: int = 3
+    MAL_BASE_URL: str = "https://api.myanimelist.net/v2"
+    MAL_CLIENT_ID: str = field(default_factory=lambda: _env("MAL_CLIENT_ID", ""))
+    ANIMEPAHE_BASE_URL: str = field(default_factory=lambda: _env("ANIMEPAHE_BASE_URL", "https://animepahe.pw").rstrip("/"))
 
     # Cache TTL (seconds)
     CACHE_TTL_SHORT: int = 300   # 5 min: top, seasonal, search
@@ -90,7 +93,7 @@ settings = get_settings()
 #
 # Get fresh cookies:
 #   1. Use a VPN (recommended)
-#   2. Visit https://animepahe.si in browser
+#   2. Visit https://animepahe.pw in browser
 #   3. DevTools (F12) → Application → Cookies
 #   4. Copy __ddg* values below or set env vars
 #
@@ -98,13 +101,25 @@ settings = get_settings()
 # =============================================================================
 
 def get_default_cookies() -> dict[str, str]:
-    """Get DDoS-Guard bypass cookies."""
-    return {
-        "__ddg1_": _env("ANIMEPAHE_DDG1", "5H0114JE1p0wQHdJiV2O"),
-        "__ddg2_": _env("ANIMEPAHE_DDG2", "FxnuwLkvPnXSQtPE"),
-        "__ddg8_": _env("ANIMEPAHE_DDG8", "j55RhixQcxVPfvqt"),
-        "__ddg9_": _env("ANIMEPAHE_DDG9", "51.158.195.12"),
-        "__ddg10_": _env("ANIMEPAHE_DDG10", "1769167572"),
-        "__ddgid_": _env("ANIMEPAHE_DDGID", "ExAWs3AJTzpAKb8m"),
-        "__ddgmark_": _env("ANIMEPAHE_DDGMARK", "slbgrX6Jj2jTxuo2"),
+    """Get Animepahe cookies from a JSON bundle or individual variables."""
+    cookies: dict[str, str] = {}
+    if raw_cookies := _env("ANIMEPAHE_COOKIES", ""):
+        try:
+            parsed = json.loads(raw_cookies)
+            if isinstance(parsed, dict):
+                cookies = {str(name): str(value) for name, value in parsed.items()}
+        except json.JSONDecodeError:
+            pass
+
+    cookie_names = {
+        "cf_clearance": "ANIMEPAHE_CF_CLEARANCE",
+        "__ddg1_": "ANIMEPAHE_DDG1",
+        "__ddg2_": "ANIMEPAHE_DDG2",
+        "__ddg8_": "ANIMEPAHE_DDG8",
+        "__ddg9_": "ANIMEPAHE_DDG9",
+        "__ddg10_": "ANIMEPAHE_DDG10",
+        "__ddgid_": "ANIMEPAHE_DDGID",
+        "__ddgmark_": "ANIMEPAHE_DDGMARK",
     }
+    cookies.update({name: value for name, env_name in cookie_names.items() if (value := _env(env_name))})
+    return cookies

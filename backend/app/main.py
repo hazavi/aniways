@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings, get_default_cookies
 from app.core.dependencies import init_dependencies, cleanup_dependencies
 from app.scrapers.animepahe import AnimepaheScraper
+from app.scrapers.animepahe.errors import AnimepaheAccessError
 from app.routes import animepahe, watch, mal
 from app.routes import auth as auth_routes
 from app.routes import animelist as list_routes
@@ -71,6 +72,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(AnimepaheAccessError)
+    async def animepahe_access_error(request: Request, exc: AnimepaheAccessError):
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     # Global error handler
     @app.exception_handler(Exception)

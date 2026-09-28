@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { api, type Anime } from "@/lib/api";
@@ -52,11 +52,21 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [characterPage, setCharacterPage] = useState(0);
   const [relationPage, setRelationPage] = useState(0);
-  const [hasEpisodes, setHasEpisodes] = useState(false);
+  const [episodeStatus, setEpisodeStatus] = useState<"checking" | "available" | "unavailable" | "blocked">("checking");
   const [loading, setLoading] = useState(true);
   const [loadingRecs, setLoadingRecs] = useState(true);
   const [showFullSynopsis, setShowFullSynopsis] = useState(false);
   const { getTitle } = useLanguage();
+
+  const checkEpisodes = useCallback(async () => {
+    setEpisodeStatus("checking");
+    try {
+      const info = await api.getAnimepaheInfo(parseInt(id));
+      setEpisodeStatus(info.total_episodes > 0 ? "available" : "unavailable");
+    } catch (error) {
+      setEpisodeStatus(error instanceof Error && error.message.includes("503") ? "blocked" : "unavailable");
+    }
+  }, [id]);
 
   useEffect(() => {
     if (anime) {
@@ -92,12 +102,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
         }
 
         // Check if episodes are available on Animepahe
-        try {
-          await api.getAnimepaheInfo(parseInt(id));
-          setHasEpisodes(true);
-        } catch {
-          setHasEpisodes(false);
-        }
+        await checkEpisodes();
       } catch (error) {
         console.error("Failed to fetch anime:", error);
       } finally {
@@ -106,7 +111,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
     }
 
     fetchData();
-  }, [id]);
+  }, [id, checkEpisodes]);
 
   if (loading) {
     return <AnimeDetailSkeleton />;
@@ -213,17 +218,21 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
-            {hasEpisodes ? (
+            {episodeStatus === "available" ? (
               <Link href={`/watch/${id}/1`}>
                 <Button className="gap-2 bg-primary hover:bg-primary/90 cursor-pointer">
                   <Play className="h-4 w-4 fill-current" />
                   Watch now
                 </Button>
               </Link>
+            ) : episodeStatus === "blocked" ? (
+              <Button className="gap-2 cursor-pointer" onClick={checkEpisodes}>
+                Retry AnimePahe
+              </Button>
             ) : (
               <Button className="gap-2 cursor-not-allowed" disabled>
                 <Play className="h-4 w-4" />
-                Not Available
+                {episodeStatus === "checking" ? "Checking..." : "Not Available"}
               </Button>
             )}
             <AddToListButton
@@ -236,6 +245,11 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
               totalEpisodes={anime.episodes}
             />
           </div>
+          {episodeStatus === "blocked" && (
+            <p className="text-sm text-muted-foreground" role="status">
+              AnimePahe is blocking stream lookup. Refresh its access cookies, then retry.
+            </p>
+          )}
 
           {/* Synopsis */}
           {anime.synopsis && (
@@ -294,9 +308,9 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
             </div>
             {anime.genres && anime.genres.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-2">
-                {anime.genres.map((genre) => (
+                {anime.genres.map((genre, index) => (
                   <Badge
-                    key={genre.mal_id}
+                    key={`genre-${genre.mal_id ?? genre.name}-${index}`}
                     variant="outline"
                     className="text-xs"
                   >
@@ -369,18 +383,18 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
             <div className="space-y-2">
               <span className="text-muted-foreground font-medium">Genres:</span>
               <div className="flex flex-wrap gap-1.5">
-                {anime.genres.map((genre) => (
+                {anime.genres.map((genre, index) => (
                   <Badge
-                    key={genre.mal_id}
+                    key={`genre-${genre.mal_id ?? genre.name}-${index}`}
                     variant="outline"
                     className="text-xs"
                   >
                     {genre.name}
                   </Badge>
                 ))}
-                {anime.demographics?.map((demo) => (
+                {anime.demographics?.map((demo, index) => (
                   <Badge
-                    key={demo.mal_id}
+                    key={`demographic-${demo.mal_id ?? demo.name}-${index}`}
                     variant="outline"
                     className="text-xs"
                   >
@@ -441,7 +455,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
               {(() => {
                 // Flatten all relation entries
                 const allRelations = anime.relations.flatMap((rel) =>
-                  rel.entry.map((entry) => ({
+                  (rel.entry ?? []).map((entry) => ({
                     ...entry,
                     relation: rel.relation,
                   })),

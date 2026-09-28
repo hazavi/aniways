@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from bs4 import BeautifulSoup
 
 from app.core.config import settings
+from app.scrapers.animepahe.errors import AnimepaheAccessError
 
 if TYPE_CHECKING:
     from app.scrapers.animepahe.client import AnimepaheScraper
@@ -37,6 +38,8 @@ async def get_anime_info(scraper: "AnimepaheScraper", uuid: str) -> dict:
             title = elem.text.strip()
 
         return {"uuid": uuid, "title": title, "total_episodes": count}
+    except AnimepaheAccessError:
+        raise
     except Exception as e:
         logger.error("Anime info error: %s", e)
         return {"uuid": uuid, "total_episodes": 0}
@@ -65,6 +68,8 @@ async def get_episodes(scraper: "AnimepaheScraper", uuid: str, page: int = 1) ->
             "total": data.get("total", 0),
             "last_page": data.get("last_page", 1),
         }
+    except AnimepaheAccessError:
+        raise
     except Exception as e:
         logger.error("Episodes error: %s", e)
         return {"episodes": [], "total": 0, "last_page": 1}

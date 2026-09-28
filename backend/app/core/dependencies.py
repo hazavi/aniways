@@ -41,4 +41,6 @@ async def cleanup_dependencies() -> None:
     global _client, _scraper
     if _client:
         await _client.aclose()
+    if _scraper:
+        await _scraper.close()
     _client = _scraper = None

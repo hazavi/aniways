@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "i.animepahe.si",
       },
+      {
+        protocol: "https",
+        hostname: "i.animepahe.pw",
+      },
     ],
   },
 };

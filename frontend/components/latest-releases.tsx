@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { api, type LatestRelease } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { AnimeInfoPopover } from "@/components/anime-info-popover";
@@ -17,20 +16,28 @@ interface LatestReleasesProps {
 export function LatestReleases({ className }: LatestReleasesProps) {
   const [releases, setReleases] = useState<LatestRelease[]>([]);
   const [loading, setLoading] = useState(true);
+  const [blocked, setBlocked] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setBlocked(false);
+    try {
+      const res = await api.getLatestReleases(1, 12);
+      setReleases(res.data || []);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("503")) {
+        setBlocked(true);
+      } else {
+        console.error("Failed to fetch latest releases:", error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await api.getLatestReleases(1, 12);
-        setReleases(res.data || []);
-      } catch (error) {
-        console.error("Failed to fetch latest releases:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr + " UTC");
@@ -57,6 +64,20 @@ export function LatestReleases({ className }: LatestReleasesProps) {
             </div>
           ))}
         </div>
+      </section>
+    );
+  }
+
+  if (blocked) {
+    return (
+      <section className={className}>
+        <h2 className="text-xl sm:text-2xl font-bold mb-4">Latest Episodes</h2>
+        <p className="text-sm text-muted-foreground" role="status">
+          AnimePahe&apos;s latest-release feed is blocked. Anime pages may still play through AnimeX.
+        </p>
+        <button type="button" onClick={fetchData} className="mt-2 text-sm text-primary hover:underline">
+          Retry AnimePahe
+        </button>
       </section>
     );
   }

@@ -8,9 +8,11 @@ Delegates to submodules for specific functionality.
 
 import logging
 import httpx
+from curl_cffi.requests import AsyncSession, Response
 
 from app.core.config import settings
 from app.extractors.kwik import KwikExtractor
+from app.scrapers.animepahe.errors import AnimepaheAccessError
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +20,11 @@ logger = logging.getLogger(__name__)
 class AnimepaheScraper:
     """Animepahe scraper - delegates to submodules."""
 
-    __slots__ = ("client", "cookies", "kwik")
+    __slots__ = ("client", "browser_client", "cookies", "kwik")
 
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
+        self.browser_client = AsyncSession(impersonate="chrome", timeout=settings.HTTP_TIMEOUT)
         self.cookies: dict[str, str] = {}
         self.kwik = KwikExtractor(client)
 
@@ -32,6 +35,8 @@ class AnimepaheScraper:
     def set_cookies(self, cookies: dict[str, str]) -> None:
         """Set DDoS-Guard bypass cookies."""
         self.cookies = cookies
+        self.browser_client.cookies.clear()
+        self.browser_client.cookies.update(cookies)
 
     def get_cookies(self) -> dict[str, str]:
         """Get current cookies."""
@@ -41,14 +46,20 @@ class AnimepaheScraper:
     # HTTP Request
     # =========================================================================
 
-    async def _request(self, url: str, **kwargs) -> httpx.Response:
-        """Make authenticated request."""
-        return await self.client.get(
+    async def _request(self, url: str, **kwargs) -> Response:
+        """Make an AnimePahe request with browser TLS and the access cookies."""
+        response = await self.browser_client.get(
             url,
-            headers={**settings.animepahe_headers, **kwargs.pop("headers", {})},
-            cookies={**self.cookies, **kwargs.pop("cookies", {})},
+            headers={k: v for k, v in settings.animepahe_headers.items() if k != "User-Agent"} | kwargs.pop("headers", {}),
+            allow_redirects=True,
             **kwargs,
         )
+        if response.status_code == 403:
+            raise AnimepaheAccessError("AnimePahe blocked the request. Refresh its access cookies and retry.")
+        return response
+
+    async def close(self) -> None:
+        await self.browser_client.close()
 
     # =========================================================================
     # Search (delegates to search.py)

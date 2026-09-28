@@ -19,6 +19,25 @@ _FIELDS = (
 )
 
 
+def _normalize_relations(relations: list[dict]) -> list[dict]:
+    """Adapt MAL v2's one-node relations to the frontend's grouped schema."""
+    normalized = []
+    for relation in relations:
+        node = relation.get("node") or {}
+        if not node.get("id"):
+            continue
+        normalized.append({
+            "relation": relation.get("relation_type_formatted") or relation.get("relation_type", "Related").replace("_", " ").title(),
+            "entry": [{
+                "mal_id": node["id"],
+                "type": "anime",
+                "name": node.get("title"),
+                "url": f"https://myanimelist.net/anime/{node['id']}",
+            }],
+        })
+    return normalized
+
+
 async def _request(endpoint: str, params: dict[str, Any] | None = None) -> dict | None:
     """Request MAL's public v2 API using the application's client ID."""
     if not settings.MAL_CLIENT_ID:
@@ -93,7 +112,7 @@ def _normalize(item: dict) -> dict:
         "genres": anime.get("genres", []),
         "themes": [],
         "demographics": [],
-        "relations": anime.get("related_anime", []),
+        "relations": _normalize_relations(anime.get("related_anime") or []),
         "streaming": [],
     }
 
