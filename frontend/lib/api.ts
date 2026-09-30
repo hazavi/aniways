@@ -1,15 +1,13 @@
 import type {
   Anime,
   WatchResponse,
-  AnimeEpisodesResponse,
-  LatestRelease,
   EpisodeInfo,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:4444";
 
 // Re-export types for backward compatibility
-export type { Anime, WatchResponse, AnimeEpisodesResponse, LatestRelease, EpisodeInfo };
+export type { Anime, WatchResponse, EpisodeInfo };
 export type { Episode, VideoSource } from "@/types";
 
 // Retry configuration for API calls
@@ -57,7 +55,7 @@ async function fetchApi<T>(
   return fetchWithRetry<T>(url.toString());
 }
 
-// API endpoints (MAL Scraper + Animepahe)
+// API endpoints (MyAnimeList catalogue and AnimeX streams)
 export const api = {
   // Search anime
   searchAnime: (q: string, page = 1) =>
@@ -97,29 +95,15 @@ export const api = {
   getSeason: (year: number, season: string, page = 1, limit = 24) =>
     fetchApi<{ data: Anime[]; pagination: { last_visible_page: number; has_next_page: boolean } }>(`/api/seasons/${year}/${season}`, { page, limit }),
 
-  // Latest releases from Animepahe
-  getLatestReleases: (page = 1, limit = 12) =>
-    fetchApi<{ data: LatestRelease[]; total: number; current_page: number; last_page: number }>("/api/animepahe/latest", { page, limit }),
-
-  // Watch (Animepahe sources)
-  getWatchSources: (malId: number, episode: number, quality = "1080") =>
-    fetchApi<WatchResponse>(`/api/watch/${malId}/${episode}`, { quality }),
-
-  // Get all episodes with sources
-  getAllSources: (malId: number) =>
-    fetchApi<AnimeEpisodesResponse>(`/api/anime/${malId}/sources`),
-
-  // Get Animepahe info for MAL ID
-  getAnimepaheInfo: (malId: number) =>
-    fetchApi<{ mal_id: number; title: string; match: { uuid: string; title: string }; total_episodes: number }>(`/api/anime/${malId}/animepahe`),
+  // AnimeX video sources and availability by MAL ID
+  getWatchSources: (malId: number, episode: number) =>
+    fetchApi<WatchResponse>(`/api/watch/${malId}/${episode}`),
+  getAnimeXInfo: (malId: number) =>
+    fetchApi<{ mal_id: number; title: string; match: { uuid: string; title: string; provider: string }; total_episodes: number }>(`/api/anime/${malId}/animex`),
 
   // Get all episode titles from MAL
   getEpisodes: (malId: number) =>
     fetchApi<{ mal_id: number; total: number; episodes: EpisodeInfo[] }>(`/api/anime/${malId}/episodes`),
-
-  // Extract video URL
-  extractVideo: (kwikUrl: string) =>
-    fetchApi<{ embed: string; video: string }>("/api/animepahe/extract", { url: kwikUrl }),
 
   // Schedule
   getSchedule: (day?: string) =>

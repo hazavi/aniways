@@ -57,6 +57,7 @@ export default function WatchPage({ params }: WatchPageProps) {
   const [totalEpisodes, setTotalEpisodes] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [selectedQuality, setSelectedQuality] = useState<string | null>(null);
+  const [playerUrl, setPlayerUrl] = useState<string | null>(null);
   const [selectedServer, setSelectedServer] = useState<"sub" | "dub">("sub");
   const [anime, setAnime] = useState<Anime | null>(null);
   const [episodeInfo, setEpisodeInfo] = useState<EpisodeInfo | null>(null);
@@ -83,12 +84,42 @@ export default function WatchPage({ params }: WatchPageProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastSavedTimeRef = useRef(0);
 
-  // Listen for messages from the iframe (kwik.cx Plyr player sends these)
+  // Keep watch progress and the outer server picker in sync with the embedded player.
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
       const data = event.data;
 
-      // kwik.cx sends currentTime as a number on timeupdate
+      if (
+        event.origin === window.location.origin &&
+        data?.source === "aniembed" &&
+        data.version === 1 &&
+        data.type === "event"
+      ) {
+        if (typeof data.data?.currentTime === "number") {
+          const currentTime = Math.floor(data.data.currentTime);
+          watchTimeRef.current = currentTime;
+          setWatchTime(currentTime);
+        }
+        if (data.name === "play") setIsPlaying(true);
+        if (data.name === "pause" || data.name === "ended") setIsPlaying(false);
+        if (data.name === "ready" || data.name === "providerchange") {
+          const language = data.data?.language;
+          const providerId = data.data?.providerId;
+          const match = sources.find((source) => {
+            if (!source.embed_url.startsWith("/animex-player/e/")) return false;
+            const url = new URL(source.embed_url, window.location.origin);
+            return url.searchParams.get("lang") === language && url.searchParams.get("s") === providerId;
+          });
+          if (match) {
+            setSelectedServer(language === "dub" ? "dub" : "sub");
+            setSelectedQuality(match.embed_url);
+          }
+        }
+        return;
+      }
+
+      // Some external players send the current time as a number.
       if (typeof data === "number" && data >= 0) {
         const currentTime = Math.floor(data);
         watchTimeRef.current = currentTime;
@@ -108,7 +139,7 @@ export default function WatchPage({ params }: WatchPageProps) {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [sources]);
 
   // Save watch progress when time updates (every 10 seconds to avoid spam)
   useEffect(() => {
@@ -235,6 +266,9 @@ export default function WatchPage({ params }: WatchPageProps) {
     );
   };
 
+  const getSourceLabel = (source: VideoSource) =>
+    source.server || (source.resolution > 0 ? `${source.resolution}p` : source.quality);
+
   // Handle server change
   const handleServerChange = (server: "sub" | "dub") => {
     setSelectedServer(server);
@@ -242,6 +276,7 @@ export default function WatchPage({ params }: WatchPageProps) {
     const highest = getHighestQuality(serverSources);
     if (highest) {
       setSelectedQuality(highest.embed_url);
+      setPlayerUrl(highest.embed_url);
     }
   };
 
@@ -274,6 +309,7 @@ export default function WatchPage({ params }: WatchPageProps) {
     setLoading(true);
     setSources([]);
     setSelectedQuality(null);
+    setPlayerUrl(null);
     setEpisodeInfo(null);
     setError(null);
 
@@ -289,14 +325,14 @@ export default function WatchPage({ params }: WatchPageProps) {
       console.error("Failed to fetch MAL data:", err);
     }
 
-    // Get accurate episode count from Animepahe
+    // Get AnimeX's episode count.
     try {
-      const animepaheRes = await api.getAnimepaheInfo(malId);
-      if (animepaheRes.total_episodes > 0) {
-        setTotalEpisodes(animepaheRes.total_episodes);
+      const animexRes = await api.getAnimeXInfo(malId);
+      if (animexRes.total_episodes > 0) {
+        setTotalEpisodes(animexRes.total_episodes);
       }
     } catch (err) {
-      console.error("Failed to fetch Animepahe info:", err);
+      console.error("Failed to fetch AnimeX info:", err);
     }
 
     try {
@@ -319,12 +355,14 @@ export default function WatchPage({ params }: WatchPageProps) {
             current.resolution > best.resolution ? current : best,
           );
           setSelectedQuality(highest.embed_url);
+          setPlayerUrl(highest.embed_url);
         } else if (dubSources.length > 0) {
           setSelectedServer("dub");
           const highest = dubSources.reduce((best, current) =>
             current.resolution > best.resolution ? current : best,
           );
           setSelectedQuality(highest.embed_url);
+          setPlayerUrl(highest.embed_url);
         }
       }
     } catch (err) {
@@ -595,19 +633,22 @@ export default function WatchPage({ params }: WatchPageProps) {
                 </Link>
               </div>
             ) : error ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-4">
                 <button
                   onClick={handleRetry}
+                  aria-label="Retry stream lookup"
                   className="group flex items-center justify-center w-20 h-20 rounded-full bg-primary/90 hover:bg-primary transition-all hover:scale-110"
                 >
                   <Play className="h-10 w-10 text-primary-foreground ml-1" />
                 </button>
               </div>
-            ) : selectedQuality ? (
+            ) : playerUrl ? (
               <iframe
                 ref={iframeRef}
-                src={`${selectedQuality}${selectedQuality.includes("?") ? "&" : "#"}t=${startTime}`}
+                src={`${playerUrl}${playerUrl.includes("?") ? "&" : "#"}t=${startTime}`}
                 className="w-full h-full"
+                title="Episode player"
+                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
                 scrolling="no"
                 allowFullScreen
               />
@@ -674,17 +715,22 @@ export default function WatchPage({ params }: WatchPageProps) {
                       )}
                     </div>
 
-                    {/* Quality Dropdown */}
+                    {/* Server or quality choice */}
                     <Select
                       value={selectedQuality || ""}
-                      onValueChange={setSelectedQuality}
+                      onValueChange={(url) => {
+                        setSelectedQuality(url);
+                        setPlayerUrl(url);
+                      }}
                     >
-                      <SelectTrigger className="w-20 h-7 text-xs">
-                        <SelectValue placeholder="Quality">
-                          {currentSources.find(
-                            (s) => s.embed_url === selectedQuality,
-                          )?.resolution || ""}
-                          p
+                      <SelectTrigger className="w-36 h-7 text-xs">
+                        <SelectValue placeholder="Server">
+                          {(() => {
+                            const selected = currentSources.find(
+                              (s) => s.embed_url === selectedQuality,
+                            );
+                            return selected ? getSourceLabel(selected) : "Server";
+                          })()}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
@@ -696,7 +742,7 @@ export default function WatchPage({ params }: WatchPageProps) {
                               value={source.embed_url}
                               className="text-xs hover:cursor-pointer"
                             >
-                              {source.resolution}p
+                              {getSourceLabel(source)}
                             </SelectItem>
                           ))}
                       </SelectContent>

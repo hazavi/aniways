@@ -56,6 +56,7 @@ export interface Episode {
 export interface VideoSource {
   embed_url: string;
   fansub: string;
+  server?: string;
   resolution: number;
   quality: string;
   audio: string;
@@ -81,28 +82,3 @@ export interface WatchResponse {
   sources: VideoSource[];
 }
 
-export interface AnimeEpisodesResponse {
-  mal_id: number;
-  title: string;
-  uuid: string;
-  total: number;
-  episodes: {
-    episode: number;
-    session: string;
-    snapshot?: string;
-    sources: VideoSource[];
-  }[];
-}
-
-export interface LatestRelease {
-  anime_title: string;
-  anime_uuid: string;
-  episode: number;
-  poster: string | null;
-  fansub: string;
-  created_at: string;
-  mal_id: number | null;
-  watch_url: string | null;
-  type?: string;
-  duration?: string;
-}

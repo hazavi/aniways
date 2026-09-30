@@ -15,10 +15,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.core.config import settings, get_default_cookies
+from app.core.config import settings
 from app.core.dependencies import init_dependencies, cleanup_dependencies
-from app.scrapers.animepahe import AnimepaheScraper
-from app.routes import animepahe, watch, mal
+from app.routes import watch, mal
 from app.routes import auth as auth_routes
 from app.routes import animelist as list_routes
 from app.database import engine, Base
@@ -42,9 +41,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
 
     client = httpx.AsyncClient(timeout=settings.HTTP_TIMEOUT)
-    scraper = AnimepaheScraper(client)
-    scraper.set_cookies(get_default_cookies())
-    init_dependencies(client, scraper)
+    init_dependencies(client)
 
     logger.info("✔️  Application ready")
 
@@ -83,7 +80,6 @@ def create_app() -> FastAPI:
 
     # Routes
     app.include_router(mal.router)
-    app.include_router(animepahe.router)
     app.include_router(watch.router)
     app.include_router(auth_routes.router)
     app.include_router(list_routes.router)

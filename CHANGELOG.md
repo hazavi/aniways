@@ -2,10 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.6.2] - 2026-09-30
+
+### Added
+
+- AnimeX Sub and Dub server choices with in-player quality, subtitle, and playback settings.
+
+### Changed
+
+- Catalogue data uses the official MyAnimeList v2 API; episode streams and availability use AnimeX.
+- The homepage shows MyAnimeList's airing list in place of the former release feed.
+
+### Removed
+
+- Obsolete provider routes, browser cookies, extraction code, and dependencies.
+
 ## [v1.6.1] - 2026-04-13
 
 ### Changed
-- Animepahe domain changed from "https://animepahe.si/" to "https://animepahe.pw/"
 - Updated packages to version: 1.6.1
 
 ### Fixed

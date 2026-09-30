@@ -6,6 +6,8 @@ Electron-based desktop application for Aniways.
 
 This folder contains the Electron wrapper that packages the Aniways frontend and backend into a standalone desktop application for Windows.
 
+The bundled backend reads anime data from the official MyAnimeList v2 API and episode streams from AnimeX.
+
 ## Files
 
 - `main.js` - Electron main process that manages the application window, starts the bundled backend server, and serves the Next.js frontend
@@ -25,8 +27,8 @@ When the desktop app starts:
 The desktop app is built automatically via GitHub Actions when you push a version tag:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.6.2
+git push origin v1.6.2
 ```
 
 This creates a Windows installer (`Aniways.Setup.X.X.X.exe`) available on the [Releases](https://github.com/hazavi/aniways/releases) page.

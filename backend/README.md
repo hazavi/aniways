@@ -1,17 +1,17 @@
 # Aniways Backend
 
-A FastAPI-based backend for anime streaming, providing data from MyAnimeList (via Jikan API) and video sources from Animepahe.
+A FastAPI-based backend for anime streaming, providing catalogue data from the official MyAnimeList v2 API and episode servers from AnimeX.
 
 ## Features
 
 - **User Authentication** - JWT-based auth with 30-day token expiry
 - **Anime Lists** - Track anime with status (Plan to Watch, Watching, Completed, Paused, Dropped)
 - **SQLite Database** - Persistent storage with SQLAlchemy ORM
-- **MyAnimeList Integration** - Anime metadata, search, seasons, schedule via Jikan API
-- **Animepahe Scraper** - Video source extraction with DDoS-Guard bypass
-- **Kwik Extractor** - Decodes obfuscated video URLs from kwik.cx
+- **MyAnimeList Integration** - Anime metadata, search, rankings, seasons, and schedules via MAL v2
+- **AnimeX Streams** - Sub and Dub server choices for available episodes
+- **AniList ID Mapping** - Connects MyAnimeList IDs to AnimeX titles
 - **Caching** - In-memory TTL cache to reduce API calls
-- **CORS Proxy** - Proxies video streams to bypass browser restrictions
+- **Player Route** - The frontend serves AnimeX's embedded player inside the watch page
 
 ## Quick Start
 
@@ -39,74 +39,59 @@ pip install -r requirements.txt
 ### Running
 
 ```bash
-# Development (with auto-reload)
+# Development (auto-reload when DEBUG=true)
 python server.py
 
 # Or with uvicorn directly
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 4444
 ```
 
-The API will be available at `http://localhost:8000`
+The API will be available at `http://localhost:4444`
 
 ### API Documentation
 
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+- Swagger UI: `http://localhost:4444/docs`
+- ReDoc: `http://localhost:4444/redoc`
 
 ## Configuration
 
 Configuration is managed via environment variables with sensible defaults:
 
-| Variable             | Default                    | Description                                |
-| -------------------- | -------------------------- | ------------------------------------------ |
-| `DEBUG`              | `false`                    | Enable debug mode with verbose logging     |
-| `HOST`               | `0.0.0.0`                  | Server bind host                           |
-| `PORT`               | `8000`                     | Server bind port                           |
-| `API_TITLE`          | `Aniways API`              | API title in docs                          |
-| `JIKAN_BASE_URL`     | `https://api.jikan.moe/v4` | Jikan API base URL                         |
-| `ANIMEPAHE_BASE_URL` | `https://animepahe.pw`     | Animepahe base URL                         |
-| `CACHE_TTL_LIST`     | `300`                      | Cache TTL for list endpoints (seconds)     |
-| `CACHE_TTL_DETAIL`   | `3600`                     | Cache TTL for detail endpoints (seconds)   |
-| `JIKAN_RATE_LIMIT`   | `0.35`                     | Min delay between Jikan requests (seconds) |
-| `DATA_DIR`           | `backend/` or `/app/data`  | Directory for SQLite database              |
-| `SECRET_KEY`         | (auto-generated)           | JWT signing key (set in production!)       |
+| Variable        | Default                   | Description                         |
+| --------------- | ------------------------- | ----------------------------------- |
+| `DEBUG`         | `false`                   | Enable debug logging and auto-reload |
+| `HOST`          | `127.0.0.1`               | Server bind host                    |
+| `PORT`          | `4444`                    | Server bind port                    |
+| `MAL_CLIENT_ID` | -                         | Required MyAnimeList v2 client ID   |
+| `DATA_DIR`      | `backend/` or `/app/data` | Directory for SQLite database       |
 
 ## Project Structure
 
 ```
 backend/
-├── server.py              # Entry point
-├── requirements.txt       # Dependencies
-├── app/
-│   ├── main.py            # FastAPI application factory
-│   ├── core/              # Core configuration
-│   │   ├── config.py      # Settings and configuration
-│   │   └── dependencies.py # Dependency injection
-│   ├── utils/             # Shared utilities
-│   │   ├── cache.py       # TTL cache implementation
-│   │   └── matching.py    # Fuzzy string matching
-│   ├── extractors/        # Video URL extractors
-│   │   └── kwik.py        # Kwik.cx video extractor
-│   ├── scrapers/          # Site-specific scrapers
-│   │   ├── jikan.py       # Jikan API wrapper (MAL data)
-│   │   └── animepahe/     # Animepahe scraper
-│   │       ├── client.py  # Main scraper class
-│   │       ├── search.py  # Search functionality
-│   │       ├── episodes.py # Episode listing
-│   │       ├── sources.py # Video source extraction
-│   │       └── latest.py  # Latest releases
-│   ├── database/          # Database layer
-│   │   ├── database.py    # SQLite connection & session
-│   │   └── models.py      # SQLAlchemy models (User, AnimeListItem)
-│   ├── auth/              # Authentication
-│   │   ├── security.py    # JWT & password hashing
-│   │   └── schemas.py     # Pydantic schemas
-│   └── routes/            # API endpoints
-│       ├── auth.py        # Register, login, user info
-│       ├── animelist.py   # Anime list management
-│       ├── mal.py         # MyAnimeList/Jikan routes
-│       ├── animepahe.py   # Animepahe routes
-│       └── watch.py       # Watch/video source routes
+??? server.py              # Entry point
+??? requirements.txt       # Dependencies
+??? app/
+    ??? main.py            # FastAPI application factory
+    ??? core/              # Configuration and shared HTTP client
+    ?   ??? config.py
+    ?   ??? dependencies.py
+    ??? utils/
+    ?   ??? cache.py       # TTL cache
+    ??? scrapers/
+    ?   ??? mal.py         # Official MyAnimeList v2 client
+    ?   ??? animex.py      # AnimeX episode servers
+    ??? database/
+    ?   ??? database.py    # SQLite connection and sessions
+    ?   ??? models.py      # User and anime-list models
+    ??? auth/
+    ?   ??? security.py    # JWT and password hashing
+    ?   ??? schemas.py     # Authentication schemas
+    ??? routes/
+        ??? auth.py        # Registration and login
+        ??? animelist.py   # Personal anime lists
+        ??? mal.py         # MyAnimeList catalogue
+        ??? watch.py       # AnimeX availability and streams
 ```
 
 ## API Reference
@@ -258,133 +243,59 @@ GET /api/schedules?filter=monday&page=1
 
 ---
 
-### Animepahe Endpoints (`/api/animepahe`)
+### AnimeX Endpoints (`/api`)
 
-#### Latest Releases
-
-```
-GET /api/animepahe/latest?page=1&limit=12
-```
-
-| Param   | Default | Description             |
-| ------- | ------- | ----------------------- |
-| `page`  | `1`     | Page number (≥1)        |
-| `limit` | `12`    | Results per page (1-50) |
-
-#### Cookies (DDoS-Guard Bypass)
+#### Availability
 
 ```
-POST /api/animepahe/cookies
-Body: {"__ddg1": "...", "__ddg2_": "...", "SERVERID": "..."}
-
-GET /api/animepahe/cookies
+GET /api/anime/{mal_id}/animex
 ```
 
-Returns truncated cookie values for verification.
-
-#### Search
-
-```
-GET /api/animepahe/search?q=naruto
-```
-
-| Param | Description             |
-| ----- | ----------------------- |
-| `q`   | Search query (required) |
-
-#### Episodes
-
-```
-GET /api/animepahe/anime/{uuid}/episodes?page=1
-```
-
-| Param  | Default | Description          |
-| ------ | ------- | -------------------- |
-| `uuid` | -       | Animepahe anime UUID |
-| `page` | `1`     | Page number (≥1)     |
-
-#### Video Sources
-
-```
-GET /api/animepahe/episode/{uuid}/{session}/sources
-```
-
-| Param     | Description          |
-| --------- | -------------------- |
-| `uuid`    | Animepahe anime UUID |
-| `session` | Episode session ID   |
-
-#### Video Extraction
-
-```
-GET /api/animepahe/extract?url=https://kwik.cx/e/...
-```
-
-Extracts m3u8 URL from kwik embed.
-
-#### CORS Proxy
-
-```
-GET /api/animepahe/proxy?url=https://...
-```
-
-Proxies m3u8 playlists and video segments to bypass CORS.
-
----
+Returns an AnimeX match and episode count when episode 1 has a playable server.
 
 ### Watch Endpoints (`/api`)
 
 #### Watch Episode
 
 ```
-GET /api/watch/{mal_id}/{episode}?quality=1080
+GET /api/watch/{mal_id}/{episode}
 ```
 
-| Param     | Default | Description                             |
-| --------- | ------- | --------------------------------------- |
-| `mal_id`  | -       | MyAnimeList anime ID                    |
-| `episode` | -       | Episode number                          |
-| `quality` | `1080`  | Preferred quality (1080, 720, 480, 360) |
+| Param     | Description          |
+| --------- | -------------------- |
+| `mal_id`  | MyAnimeList anime ID |
+| `episode` | Episode number       |
 
-Returns video sources for a specific episode, automatically matching MAL to Animepahe.
+Returns the available AnimeX Sub and Dub player servers for an episode, including ZEN when offered.
 
-#### All Episode Sources
-
-```
-GET /api/anime/{mal_id}/sources
-```
-
-Returns all episodes with their video sources. **Warning**: Slow for long series.
-
-#### Animepahe Match
+#### Numbered Episodes
 
 ```
-GET /api/anime/{mal_id}/animepahe
+GET /api/anime/{mal_id}/episodes
 ```
 
-Returns Animepahe match info for a MAL ID (uuid, title match, episode count).
+Returns numbered episodes from MyAnimeList's published episode count. The public API does not supply episode titles.
 
-## DDoS-Guard Bypass
+## AnimeX Playback
 
-Animepahe uses DDoS-Guard protection. To access it, you need to provide valid cookies:
+The backend maps a MyAnimeList ID to AnimeX through AniList, then reads the server list for the requested episode. The frontend serves the native player through `/animex-player/`, allowing its Quality, Subtitles, Settings, and Servers controls to appear in the watch page.
 
-1. Visit [animepahe.si](https://animepahe.si) in your browser
-2. Open DevTools (F12) → Application → Cookies
-3. Copy all cookie values
-4. POST them to `/api/animepahe/cookies`:
+## MyAnimeList API Setup
 
-```bash
-curl -X POST http://localhost:8000/api/animepahe/cookies \
-  -H "Content-Type: application/json" \
-  -d '{"__ddg1": "...", "__ddg2_": "...", "SERVERID": "..."}'
+Create an API client at MyAnimeList, then set its client ID before starting the backend. Catalogue endpoints use the `X-MAL-CLIENT-ID` header, so no user access token is required.
+
+Create `backend/.env` from `backend/.env.example`, then replace its `MAL_CLIENT_ID` value with your registered client ID. The `.env` file is ignored by Git and is loaded automatically when the backend starts.
+
+```powershell
+python server.py
 ```
 
-Cookies typically need to be refreshed periodically (every few hours).
+MAL v2 does not expose public anime-character or per-episode-title endpoints. Those responses remain available in the API shape but contain no character or episode-title data.
 
 ## Rate Limiting
 
-- **Jikan API**: Max 3 requests/second (configurable via `JIKAN_RATE_LIMIT`)
-- **Animepahe**: Batch processing with 500ms delays between batches
+- **MyAnimeList API**: Uses the registered application's client ID for catalogue requests
+- **AnimeX**: Server choices are requested per episode
 
 ## Caching
 
@@ -392,7 +303,7 @@ The backend uses in-memory caching to reduce load:
 
 - **List endpoints** (top, browse, search): 5 minutes
 - **Detail endpoints** (anime, recommendations): 1 hour
-- **Animepahe responses**: Not cached (real-time)
+- **AnimeX media IDs**: Cached for one hour; episode servers are requested when needed
 
 ## Development
 

@@ -2,13 +2,13 @@
 MAL Routes
 ==========
 
-MyAnimeList data via Jikan API.
+MyAnimeList data via the official MAL v2 API.
 """
 
 import logging
 from fastapi import APIRouter, HTTPException, Query
 
-from app.scrapers.jikan import (
+from app.scrapers.mal import (
     browse_anime,
     scrape_anime_details,
     scrape_characters,

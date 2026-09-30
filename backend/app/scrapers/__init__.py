@@ -1,5 +1,3 @@
 """Scrapers Package"""
 
-from app.scrapers.animepahe import AnimepaheScraper
-
-__all__ = ["AnimepaheScraper"]
+"""MAL catalogue and AnimeX stream providers."""
