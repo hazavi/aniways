@@ -101,7 +101,7 @@ export const api = {
   getAnimeXInfo: (malId: number) =>
     fetchApi<{ mal_id: number; title: string; match: { uuid: string; title: string; provider: string }; total_episodes: number }>(`/api/anime/${malId}/animex`),
 
-  // Get all episode titles from MAL
+  // Get episode titles from the backend
   getEpisodes: (malId: number) =>
     fetchApi<{ mal_id: number; total: number; episodes: EpisodeInfo[] }>(`/api/anime/${malId}/episodes`),
 

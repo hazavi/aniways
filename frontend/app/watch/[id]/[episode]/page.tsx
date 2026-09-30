@@ -63,7 +63,7 @@ export default function WatchPage({ params }: WatchPageProps) {
   const [episodeInfo, setEpisodeInfo] = useState<EpisodeInfo | null>(null);
   const [allEpisodes, setAllEpisodes] = useState<EpisodeInfo[]>([]);
   const [episodeListView, setEpisodeListView] = useState<"grid" | "list">(
-    "grid",
+    "list",
   );
   const [error, setError] = useState<string | null>(null);
   const [episodeRange, setEpisodeRange] = useState<string>("1-100");
@@ -200,11 +200,16 @@ export default function WatchPage({ params }: WatchPageProps) {
   // Set page title
   useEffect(() => {
     if (anime) {
-      document.title = `${getTitle(anime)} - Episode ${episodeNum} - Aniways`;
+      const episode = allEpisodes.find((item) => item.episode === episodeNum);
+      const episodeTitle = episode ? getEpisodeTitle(episode, episodeNum) : `Episode ${episodeNum}`;
+      const label = episodeTitle === `Episode ${episodeNum}`
+        ? episodeTitle
+        : `Episode ${episodeNum}: ${episodeTitle}`;
+      document.title = `${getTitle(anime)} - ${label} - Aniways`;
     } else {
       document.title = `Episode ${episodeNum} - Aniways`;
     }
-  }, [anime, episodeNum, getTitle]);
+  }, [anime, episodeNum, getTitle, allEpisodes, getEpisodeTitle]);
 
   // Load sort preference from localStorage
   useEffect(() => {
@@ -280,22 +285,21 @@ export default function WatchPage({ params }: WatchPageProps) {
     }
   };
 
-  // Toggle episode list view and load titles if needed
-  const toggleEpisodeView = async () => {
-    if (episodeListView === "grid") {
-      setEpisodeListView("list");
-      // Load episode titles if not already loaded
-      if (allEpisodes.length === 0) {
-        try {
-          const res = await api.getEpisodes(malId);
-          setAllEpisodes(res.episodes || []);
-        } catch (err) {
-          console.error("Failed to fetch episode titles:", err);
-        }
-      }
-    } else {
-      setEpisodeListView("grid");
-    }
+  useEffect(() => {
+    let active = true;
+    setAllEpisodes([]);
+    api.getEpisodes(malId)
+      .then((res) => {
+        if (active) setAllEpisodes(res.episodes || []);
+      })
+      .catch((err) => console.error("Failed to fetch episode titles:", err));
+    return () => {
+      active = false;
+    };
+  }, [malId]);
+
+  const toggleEpisodeView = () => {
+    setEpisodeListView((view) => view === "grid" ? "list" : "grid");
   };
 
   // Get episode title by number using language preference
@@ -657,6 +661,13 @@ export default function WatchPage({ params }: WatchPageProps) {
             )}
           </div>
 
+          <h2 className="text-sm sm:text-base font-semibold">
+            Episode {episodeNum}
+            {getEpisodeTitleByNum(episodeNum) !== `Episode ${episodeNum}` && (
+              <span className="text-muted-foreground font-normal">: {getEpisodeTitleByNum(episodeNum)}</span>
+            )}
+          </h2>
+
           {/* Video Controls */}
           <div className="py-2">
             {/* Mobile: Stack controls, Desktop: Single row */}
@@ -846,7 +857,7 @@ export default function WatchPage({ params }: WatchPageProps) {
         </div>
 
         {/* Right: Episode List */}
-        <div className="w-full lg:w-64 flex-shrink-0 space-y-3">
+        <div className="w-full lg:w-72 2xl:w-80 flex-shrink-0 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-medium shrink-0">Episodes</h3>
             <div className="relative flex items-center">
@@ -965,7 +976,7 @@ export default function WatchPage({ params }: WatchPageProps) {
                       <Button
                         variant={ep === episodeNum ? "default" : "ghost"}
                         size="sm"
-                        className={`w-full h-9 text-xs justify-start px-2 overflow-hidden hover:cursor-pointer ${
+                        className={`w-full h-auto min-h-9 py-2 text-xs text-left whitespace-normal justify-start px-2 hover:cursor-pointer ${
                           ep === episodeNum
                             ? "bg-primary"
                             : "bg-muted/50 hover:bg-muted"
@@ -974,7 +985,7 @@ export default function WatchPage({ params }: WatchPageProps) {
                       >
                         <span className="font-bold shrink-0">{ep}.</span>
                         {hasTitle && (
-                          <span className="ml-1 truncate">{title}</span>
+                          <span className="ml-1 break-words">{title}</span>
                         )}
                       </Button>
                     </Link>

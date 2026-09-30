@@ -2,8 +2,11 @@
 
 import asyncio
 import logging
+import re
 from datetime import date
 from typing import Any
+
+from bs4 import BeautifulSoup
 
 from app.core.config import settings
 from app.core.dependencies import get_client
@@ -233,10 +236,73 @@ async def scrape_episode(mal_id: int, episode_num: int) -> dict | None:
 
 
 async def scrape_all_episodes(mal_id: int) -> list[dict]:
-    """Return numbered episodes from MAL's published episode count."""
+    """Read MAL's episode table, preserving numbered fallbacks for missing rows."""
     anime = await scrape_anime_details(mal_id)
     episode_count = (anime or {}).get("episodes") or 0
-    return [{"mal_id": mal_id, "episode": number, "title": None, "title_japanese": None, "title_romanji": None, "aired": None, "filler": False, "recap": False} for number in range(1, episode_count + 1)]
+    key = f"episodes:{mal_id}"
+    if cached := cache.get(key, settings.CACHE_TTL_LONG):
+        return cached
+
+    found: dict[int, dict] = {}
+    url = f"https://myanimelist.net/anime/{mal_id}/_/episode"
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; Aniways/1.6.2)", "Accept": "text/html"}
+    for offset in range(0, max(episode_count, 1), 100):
+        try:
+            response = await get_client().get(url, params={"offset": offset}, headers=headers)
+            response.raise_for_status()
+        except Exception as exc:
+            logger.warning("MAL episode list failed for %s at offset %s: %s", mal_id, offset, exc)
+            break
+
+        rows = _parse_episode_rows(response.text, mal_id)
+        if not rows:
+            break
+        found.update({row["episode"]: row for row in rows})
+        if len(rows) < 100 or (episode_count and len(found) >= episode_count):
+            break
+
+    count = max(episode_count, max(found, default=0))
+    episodes = [found.get(number) or _empty_episode(mal_id, number) for number in range(1, count + 1)]
+    if found:
+        cache.set(key, episodes)
+    return episodes
+
+
+def _empty_episode(mal_id: int, number: int) -> dict:
+    return {"mal_id": mal_id, "episode": number, "title": None, "title_japanese": None, "title_romanji": None, "aired": None, "filler": False, "recap": False}
+
+
+def _parse_episode_rows(html: str, mal_id: int) -> list[dict]:
+    """Extract episode metadata from MAL's public episode table."""
+    soup = BeautifulSoup(html, "html.parser")
+    episodes = []
+    for row in soup.select("table.js-watch-episode-list tbody tr"):
+        number_cell = row.select_one("td.episode-number")
+        title_cell = row.select_one("td.episode-title")
+        if not number_cell or not title_cell:
+            continue
+        number_text = number_cell.get_text(" ", strip=True)
+        if not number_text.isdigit():
+            continue
+
+        title_link = title_cell.select_one("a")
+        romanji_span = title_cell.select_one("span.di-ib")
+        romanji_text = romanji_span.get_text(" ", strip=True) if romanji_span else ""
+        romanji_match = re.fullmatch(r"(.*?)\s*\(([^()]*)\)", romanji_text)
+        aired_cell = row.select_one("td.episode-aired")
+        aired = aired_cell.get_text(" ", strip=True) if aired_cell else ""
+        markers = [marker.get_text(" ", strip=True).lower() for marker in title_cell.select(".icon-episode-type-bg")]
+        episodes.append({
+            "mal_id": mal_id,
+            "episode": int(number_text),
+            "title": title_link.get_text(" ", strip=True) or None if title_link else None,
+            "title_romanji": (romanji_match.group(1).strip() if romanji_match else romanji_text) or None,
+            "title_japanese": romanji_match.group(2).strip() if romanji_match else None,
+            "aired": aired if aired and aired != "N/A" else None,
+            "filler": "filler" in markers,
+            "recap": "recap" in markers,
+        })
+    return episodes
 
 
 async def scrape_recommendations(mal_id: int, limit: int = 12) -> list[dict]:
