@@ -75,6 +75,7 @@ export default function WatchPage({ params }: WatchPageProps) {
   const [episodeSort, setEpisodeSort] = useState<"asc" | "desc">("asc");
   const [highlightedEp, setHighlightedEp] = useState<number | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showFullSynopsis, setShowFullSynopsis] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [watchTime, setWatchTime] = useState(startTime);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -87,6 +88,10 @@ export default function WatchPage({ params }: WatchPageProps) {
   const watchTimeRef = useRef(startTime);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastSavedTimeRef = useRef(0);
+
+  useEffect(() => {
+    setShowFullSynopsis(false);
+  }, [malId]);
 
   useEffect(() => {
     watchTimeRef.current = startTime;
@@ -473,6 +478,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       .filter((entry) => entry.mal_id && entry.mal_id !== malId)
       .map((entry) => ({ ...entry, relation: relation.relation })),
   );
+  const isSynopsisLong = (anime?.synopsis?.length || 0) > 300;
 
   return (
     <div className="space-y-4 mt-6 mb-10 px-4 md:px-10 lg:px-20">
@@ -875,7 +881,21 @@ export default function WatchPage({ params }: WatchPageProps) {
               </div>
             </div>
             {anime.synopsis && (
-              <p className="line-clamp-4 text-sm leading-relaxed text-muted-foreground">{anime.synopsis}</p>
+              <div className="space-y-2">
+                <p className={`text-sm leading-relaxed text-muted-foreground ${!showFullSynopsis && isSynopsisLong ? "line-clamp-3" : ""}`}>
+                  {anime.synopsis}
+                </p>
+                {isSynopsisLong && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullSynopsis((shown) => !shown)}
+                    aria-expanded={showFullSynopsis}
+                    className="cursor-pointer text-sm font-medium text-primary hover:underline"
+                  >
+                    {showFullSynopsis ? "- Less" : "+ More"}
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
