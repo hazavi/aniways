@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { api, type VideoSource, type Anime, type EpisodeInfo } from "@/lib/api";
-import { saveWatchProgress } from "@/lib/watch-history";
+import { getEpisodeWatchProgress, saveWatchProgress, type WatchHistoryItem } from "@/lib/watch-history";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -40,6 +40,9 @@ import {
   Maximize2,
   Minimize2,
   Focus,
+  ChevronRight,
+  Captions,
+  Mic2,
 } from "lucide-react";
 
 interface WatchPageProps {
@@ -62,8 +65,9 @@ export default function WatchPage({ params }: WatchPageProps) {
   const [anime, setAnime] = useState<Anime | null>(null);
   const [episodeInfo, setEpisodeInfo] = useState<EpisodeInfo | null>(null);
   const [allEpisodes, setAllEpisodes] = useState<EpisodeInfo[]>([]);
+  const [episodeProgress, setEpisodeProgress] = useState<Record<number, WatchHistoryItem>>({});
   const [episodeListView, setEpisodeListView] = useState<"grid" | "list">(
-    "grid",
+    "list",
   );
   const [error, setError] = useState<string | null>(null);
   const [episodeRange, setEpisodeRange] = useState<string>("1-100");
@@ -71,6 +75,7 @@ export default function WatchPage({ params }: WatchPageProps) {
   const [episodeSort, setEpisodeSort] = useState<"asc" | "desc">("asc");
   const [highlightedEp, setHighlightedEp] = useState<number | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showFullSynopsis, setShowFullSynopsis] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [watchTime, setWatchTime] = useState(startTime);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -83,6 +88,22 @@ export default function WatchPage({ params }: WatchPageProps) {
   const watchTimeRef = useRef(startTime);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastSavedTimeRef = useRef(0);
+
+  useEffect(() => {
+    setShowFullSynopsis(false);
+  }, [malId]);
+
+  useEffect(() => {
+    watchTimeRef.current = startTime;
+    lastSavedTimeRef.current = 0;
+    setWatchTime(startTime);
+  }, [malId, episodeNum, startTime]);
+
+  useEffect(() => {
+    setEpisodeProgress(Object.fromEntries(
+      getEpisodeWatchProgress(malId).map((item) => [item.episode, item]),
+    ));
+  }, [malId]);
 
   // Keep watch progress and the outer server picker in sync with the embedded player.
   useEffect(() => {
@@ -150,21 +171,25 @@ export default function WatchPage({ params }: WatchPageProps) {
       anime.images?.jpg?.large_image_url ||
       "/placeholder.png";
 
+    const episodeDuration = allEpisodes.find((item) => item.episode === episodeNum)?.duration || DEFAULT_DURATION;
+
     const saveProgress = (timestamp: number) => {
       // Only save if time has changed by at least 5 seconds
       if (Math.abs(timestamp - lastSavedTimeRef.current) < 5) return;
       lastSavedTimeRef.current = timestamp;
 
-      saveWatchProgress({
+      const item = {
         malId,
         episode: episodeNum,
         timestamp,
-        duration: DEFAULT_DURATION,
+        duration: episodeDuration,
         animeTitle: anime.title || "",
         animeTitleEnglish: anime.title_english,
         imageUrl,
         lastWatched: Date.now(),
-      });
+      };
+      saveWatchProgress(item);
+      setEpisodeProgress((progress) => ({ ...progress, [episodeNum]: item }));
     };
 
     // Save progress every 10 seconds based on actual watchTime from player
@@ -195,16 +220,21 @@ export default function WatchPage({ params }: WatchPageProps) {
       // Save final progress on cleanup
       saveProgress(watchTimeRef.current);
     };
-  }, [anime, selectedQuality, malId, episodeNum]);
+  }, [anime, selectedQuality, malId, episodeNum, allEpisodes]);
 
   // Set page title
   useEffect(() => {
     if (anime) {
-      document.title = `${getTitle(anime)} - Episode ${episodeNum} - Aniways`;
+      const episode = allEpisodes.find((item) => item.episode === episodeNum);
+      const episodeTitle = episode ? getEpisodeTitle(episode, episodeNum) : `Episode ${episodeNum}`;
+      const label = episodeTitle === `Episode ${episodeNum}`
+        ? episodeTitle
+        : `Episode ${episodeNum}: ${episodeTitle}`;
+      document.title = `${getTitle(anime)} - ${label} - Aniways`;
     } else {
       document.title = `Episode ${episodeNum} - Aniways`;
     }
-  }, [anime, episodeNum, getTitle]);
+  }, [anime, episodeNum, getTitle, allEpisodes, getEpisodeTitle]);
 
   // Load sort preference from localStorage
   useEffect(() => {
@@ -280,22 +310,25 @@ export default function WatchPage({ params }: WatchPageProps) {
     }
   };
 
-  // Toggle episode list view and load titles if needed
-  const toggleEpisodeView = async () => {
-    if (episodeListView === "grid") {
-      setEpisodeListView("list");
-      // Load episode titles if not already loaded
-      if (allEpisodes.length === 0) {
-        try {
-          const res = await api.getEpisodes(malId);
+  useEffect(() => {
+    let active = true;
+    setAllEpisodes([]);
+    setTotalEpisodes(0);
+    api.getEpisodes(malId)
+      .then((res) => {
+        if (active) {
           setAllEpisodes(res.episodes || []);
-        } catch (err) {
-          console.error("Failed to fetch episode titles:", err);
+          setTotalEpisodes((count) => Math.max(count, res.total || 0));
         }
-      }
-    } else {
-      setEpisodeListView("grid");
-    }
+      })
+      .catch((err) => console.error("Failed to fetch episode titles:", err));
+    return () => {
+      active = false;
+    };
+  }, [malId]);
+
+  const toggleEpisodeView = () => {
+    setEpisodeListView((view) => view === "grid" ? "list" : "grid");
   };
 
   // Get episode title by number using language preference
@@ -303,6 +336,15 @@ export default function WatchPage({ params }: WatchPageProps) {
     const ep = allEpisodes.find((e) => e.episode === epNum);
     if (!ep) return `Episode ${epNum}`;
     return getEpisodeTitle(ep, epNum);
+  };
+
+  const getProgressPercent = (epNum: number, info?: EpisodeInfo) => {
+    const saved = episodeProgress[epNum];
+    const timestamp = epNum === episodeNum
+      ? Math.max(watchTime, saved?.timestamp || 0)
+      : saved?.timestamp || 0;
+    const duration = info?.duration || saved?.duration || DEFAULT_DURATION;
+    return timestamp > 0 ? Math.min(100, Math.round((timestamp / duration) * 100)) : 0;
   };
 
   const fetchData = useCallback(async () => {
@@ -319,7 +361,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       if (animeRes.data) {
         setAnime(animeRes.data);
         // Initial episode count from MAL (may be 0 for ongoing)
-        setTotalEpisodes(animeRes.data.episodes || 0);
+        setTotalEpisodes((count) => Math.max(count, animeRes.data.episodes || 0));
       }
     } catch (err) {
       console.error("Failed to fetch MAL data:", err);
@@ -329,7 +371,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       const watchRes = await api.getWatchSources(malId, episodeNum);
       setSources(watchRes.sources || []);
       if (watchRes.total_episodes && watchRes.total_episodes > 0) {
-        setTotalEpisodes(watchRes.total_episodes);
+        setTotalEpisodes((count) => Math.max(count, watchRes.total_episodes || 0));
       }
 
       // Set episode info
@@ -382,9 +424,12 @@ export default function WatchPage({ params }: WatchPageProps) {
   // Calculate episode ranges for dropdown
   const getEpisodeRanges = () => {
     const ranges = [];
-    // Use totalEpisodes if available, otherwise use current episode + buffer
+    // Include every episode returned by the title endpoint, even if another
+    // provider reports a smaller count.
     const maxEp =
-      totalEpisodes > 0 ? totalEpisodes : Math.max(episodeNum + 100, 100);
+      totalEpisodes > 0 || allEpisodes.length > 0
+        ? Math.max(totalEpisodes, allEpisodes.length, episodeNum)
+        : Math.max(episodeNum + 100, 100);
     for (let i = 0; i < maxEp; i += 100) {
       const start = i + 1;
       const end = Math.min(i + 100, maxEp);
@@ -404,7 +449,9 @@ export default function WatchPage({ params }: WatchPageProps) {
     const episodes = [];
     // Use totalEpisodes to limit the range
     const maxEp =
-      totalEpisodes > 0 ? totalEpisodes : Math.max(episodeNum + 100, end);
+      totalEpisodes > 0 || allEpisodes.length > 0
+        ? Math.max(totalEpisodes, allEpisodes.length, episodeNum)
+        : Math.max(episodeNum + 100, end);
     for (let i = start; i <= Math.min(end, maxEp); i++) {
       episodes.push(i);
     }
@@ -414,15 +461,24 @@ export default function WatchPage({ params }: WatchPageProps) {
   // Set initial episode range based on current episode when totalEpisodes changes
   useEffect(() => {
     const maxEp =
-      totalEpisodes > 0 ? totalEpisodes : Math.max(episodeNum + 100, 100);
+      totalEpisodes > 0 || allEpisodes.length > 0
+        ? Math.max(totalEpisodes, allEpisodes.length, episodeNum)
+        : Math.max(episodeNum + 100, 100);
     const rangeStart = Math.floor((episodeNum - 1) / 100) * 100 + 1;
     const rangeEnd = Math.min(rangeStart + 99, maxEp);
     setEpisodeRange(`${rangeStart}-${rangeEnd}`);
-  }, [totalEpisodes, episodeNum]);
+  }, [totalEpisodes, allEpisodes.length, episodeNum]);
 
   if (loading) {
     return <WatchSkeleton />;
   }
+
+  const relatedAnime = (anime?.relations || []).flatMap((relation) =>
+    (relation.entry || [])
+      .filter((entry) => entry.mal_id && entry.mal_id !== malId)
+      .map((entry) => ({ ...entry, relation: relation.relation })),
+  );
+  const isSynopsisLong = (anime?.synopsis?.length || 0) > 300;
 
   return (
     <div className="space-y-4 mt-6 mb-10 px-4 md:px-10 lg:px-20">
@@ -465,153 +521,10 @@ export default function WatchPage({ params }: WatchPageProps) {
         />
       )}
 
-      {/* Main Layout: Video first on mobile, then Info | Video | Episodes on desktop */}
-      <div className="flex flex-col lg:flex-row lg:items-start gap-4 mt-6 lg:mt-10">
-        {/* Left: Anime Info - Only shown on 2xl screens and up */}
-        {anime && !isExpanded && (
-          <div className="hidden 2xl:block 2xl:w-72 flex-shrink-0">
-            <ScrollArea className="h-[420px] pr-3">
-              <div className="space-y-3">
-                {/* Poster */}
-                <div className="relative aspect-[3/4] w-full max-w-[120px] mx-auto rounded-lg overflow-hidden">
-                  <Image
-                    src={
-                      anime.images.jpg.large_image_url ||
-                      anime.images.jpg.image_url
-                    }
-                    alt={getTitle(anime)}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-
-                {/* Title */}
-                <h2 className="text-lg font-bold">{getTitle(anime)}</h2>
-
-                {/* Japanese Title */}
-                {anime.title_japanese && (
-                  <p className="text-sm text-muted-foreground">
-                    {anime.title_japanese}
-                  </p>
-                )}
-
-                {/* Info Badges */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {anime.rating && (
-                    <Badge variant="outline" className="text-xs">
-                      {anime.rating.split(" ")[0]}
-                    </Badge>
-                  )}
-                  {anime.episodes && (
-                    <Badge className="text-xs bg-zinc-700 text-white">
-                      {anime.episodes} Ep.
-                    </Badge>
-                  )}
-                  {anime.type && (
-                    <Badge variant="outline" className="text-xs">
-                      {anime.type}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Synopsis */}
-                {anime.synopsis && (
-                  <p className="text-sm text-muted-foreground line-clamp-4">
-                    {anime.synopsis}
-                  </p>
-                )}
-
-                {/* Details */}
-                <div className="space-y-2 text-sm">
-                  {/* Country */}
-                  <div>
-                    <span className="text-muted-foreground">Country: </span>
-                    <span className="text-foreground">Japan</span>
-                  </div>
-
-                  {/* Genres */}
-                  {anime.genres && anime.genres.length > 0 && (
-                    <div>
-                      <span className="text-muted-foreground">Genres: </span>
-                      <span className="text-foreground">
-                        {anime.genres.map((g) => g.name).join(", ")}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Premiered */}
-                  {anime.season && anime.year && (
-                    <div>
-                      <span className="text-muted-foreground">Premiered: </span>
-                      <span className="text-foreground">
-                        {anime.season.charAt(0).toUpperCase() +
-                          anime.season.slice(1)}{" "}
-                        {anime.year}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Date aired */}
-                  {anime.aired?.string && (
-                    <div>
-                      <span className="text-muted-foreground">
-                        Date aired:{" "}
-                      </span>
-                      <span className="text-foreground">
-                        {anime.aired.string}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Duration */}
-                  {anime.duration && (
-                    <div>
-                      <span className="text-muted-foreground">Duration: </span>
-                      <span className="text-foreground">
-                        {anime.duration.replace(" per ep", "")}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Status */}
-                  {anime.status && (
-                    <div>
-                      <span className="text-muted-foreground">Status: </span>
-                      <span
-                        className={
-                          anime.airing ? "text-green-500" : "text-foreground"
-                        }
-                      >
-                        {anime.status}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Studios */}
-                  {anime.studios && anime.studios.length > 0 && (
-                    <div>
-                      <span className="text-muted-foreground">Studios: </span>
-                      <span className="text-foreground">
-                        {anime.studios.map((s) => s.name).join(", ")}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Score */}
-                  {anime.score && (
-                    <div>
-                      <span className="text-muted-foreground">MAL Score: </span>
-                      <span className="text-foreground">{anime.score}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </ScrollArea>
-          </div>
-        )}
-
-        {/* Center: Video Player */}
-        <div className="flex-1 min-w-0 space-y-3">
+      {/* Player and episodes */}
+      <div className="grid gap-4 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,25rem)] lg:items-start">
+        {/* Video Player */}
+        <div className={`order-1 min-w-0 space-y-3 ${isExpanded ? "lg:col-span-2" : "lg:col-start-1 lg:row-start-1"}`}>
           <div
             className={`relative w-full bg-black rounded-lg overflow-hidden ${isFocused ? "relative z-50" : ""}`}
             style={{ aspectRatio: "16/9" }}
@@ -657,196 +570,106 @@ export default function WatchPage({ params }: WatchPageProps) {
             )}
           </div>
 
-          {/* Video Controls */}
-          <div className="py-2">
-            {/* Mobile: Stack controls, Desktop: Single row */}
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {/* Previous - Hidden on mobile */}
-              <div className="hidden lg:block">
-                {episodeNum > 1 && (
-                  <Link href={`/watch/${id}/${episodeNum - 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 gap-1.5 text-muted-foreground hover:text-foreground hover:cursor-pointer"
-                    >
-                      <SkipBack className="h-3.5 w-3.5" />
-                      <span className="text-xs">Prev</span>
-                    </Button>
-                  </Link>
-                )}
-              </div>
+          <div className="grid grid-cols-[2rem_minmax(0,1fr)_2rem] items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+            {episodeNum > 1 ? (
+              <Link href={`/watch/${id}/${episodeNum - 1}`} className="justify-self-start">
+                <Button variant="ghost" size="sm" className="h-8 w-8 gap-1 text-muted-foreground hover:text-foreground sm:w-auto">
+                  <SkipBack className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Prev</span>
+                </Button>
+              </Link>
+            ) : <span />}
 
-              {/* Server & Quality - Always visible */}
-              <div className="flex-shrink-0">
-                {sources.length > 0 && (
-                  <div className="flex items-center justify-center gap-2">
-                    {/* Server Toggle */}
-                    <div className="flex rounded-lg overflow-hidden border border-border">
+            <div className="mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-white/15 bg-black/80 p-1 text-white">
+              {sources.length > 0 && (
+                <>
+                  <div className="flex shrink-0 overflow-hidden rounded-md border border-white/20">
+                    <button
+                      type="button"
+                      aria-label="Subtitled servers"
+                      onClick={() => handleServerChange("sub")}
+                      disabled={subSources.length === 0}
+                      className={`px-2 py-1.5 text-[11px] font-semibold disabled:opacity-40 ${selectedServer === "sub" ? "bg-primary text-primary-foreground" : "hover:bg-white/15"}`}
+                    >
+                      SUB
+                    </button>
+                    {dubSources.length > 0 && (
                       <button
-                        className={`px-3 py-1 text-xs font-medium transition-all hover:cursor-pointer ${
-                          selectedServer === "sub"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        }`}
-                        onClick={() => handleServerChange("sub")}
-                        disabled={subSources.length === 0}
+                        type="button"
+                        aria-label="Dubbed servers"
+                        onClick={() => handleServerChange("dub")}
+                        className={`border-l border-white/20 px-2 py-1.5 text-[11px] font-semibold ${selectedServer === "dub" ? "bg-primary text-primary-foreground" : "hover:bg-white/15"}`}
                       >
-                        SUB
+                        DUB
                       </button>
-                      {dubSources.length > 0 && (
-                        <button
-                          className={`px-3 py-1 text-xs font-medium border-l border-border transition-all hover:cursor-pointer ${
-                            selectedServer === "dub"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                          }`}
-                          onClick={() => handleServerChange("dub")}
-                        >
-                          DUB
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Server or quality choice */}
-                    <Select
-                      value={selectedQuality || ""}
-                      onValueChange={(url) => {
-                        setSelectedQuality(url);
-                        setPlayerUrl(url);
-                      }}
-                    >
-                      <SelectTrigger className="w-36 h-7 text-xs">
-                        <SelectValue placeholder="Server">
-                          {(() => {
-                            const selected = currentSources.find(
-                              (s) => s.embed_url === selectedQuality,
-                            );
-                            return selected ? getSourceLabel(selected) : "Server";
-                          })()}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currentSources
-                          .sort((a, b) => b.resolution - a.resolution)
-                          .map((source, index) => (
-                            <SelectItem
-                              key={`${source.resolution}-${index}`}
-                              value={source.embed_url}
-                              className="text-xs hover:cursor-pointer"
-                            >
-                              {getSourceLabel(source)}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              {/* Expand & Focus buttons */}
-              <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 gap-1 text-muted-foreground hover:text-foreground hover:cursor-pointer"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  title={isExpanded ? "Show info" : "Expand player"}
-                >
-                  {isExpanded ? (
-                    <Minimize2 className="h-4 w-4" />
-                  ) : (
-                    <Maximize2 className="h-4 w-4" />
-                  )}
-                  <span className="text-xs">Expand</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`h-8 px-2 gap-1 hover:cursor-pointer ${isFocused ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                  onClick={() => setIsFocused(!isFocused)}
-                  title={isFocused ? "Exit focus" : "Focus mode"}
-                >
-                  <Focus className="h-4 w-4" />
-                  <span className="text-xs">Focus</span>
-                </Button>
-              </div>
-
-              {/* Next - Hidden on mobile */}
-              <div className="hidden lg:block flex-shrink-0">
-                {(totalEpisodes === 0 || episodeNum < totalEpisodes) && (
-                  <Link href={`/watch/${id}/${episodeNum + 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 gap-1.5 text-muted-foreground hover:text-foreground hover:cursor-pointer"
-                    >
-                      <span className="text-xs">Next</span>
-                      <SkipForward className="h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
-                )}
-              </div>
-
-              {/* Mobile controls row */}
-              <div className="flex lg:hidden items-center justify-between w-full mt-2">
-                {episodeNum > 1 ? (
-                  <Link href={`/watch/${id}/${episodeNum - 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 gap-1"
-                    >
-                      <SkipBack className="h-4 w-4" />
-                      <span className="text-xs">Prev</span>
-                    </Button>
-                  </Link>
-                ) : (
-                  <div className="w-16" />
-                )}
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                  >
-                    {isExpanded ? (
-                      <Minimize2 className="h-4 w-4" />
-                    ) : (
-                      <Maximize2 className="h-4 w-4" />
                     )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-8 w-8 p-0 ${isFocused ? "text-primary" : ""}`}
-                    onClick={() => setIsFocused(!isFocused)}
+                  </div>
+                  <Select
+                    value={selectedQuality || ""}
+                    onValueChange={(url) => {
+                      setSelectedQuality(url);
+                      setPlayerUrl(url);
+                    }}
                   >
-                    <Focus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {totalEpisodes === 0 || episodeNum < totalEpisodes ? (
-                  <Link href={`/watch/${id}/${episodeNum + 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 gap-1"
-                    >
-                      <span className="text-xs">Next</span>
-                      <SkipForward className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                ) : (
-                  <div className="w-16" />
-                )}
-              </div>
+                    <SelectTrigger className="h-7 w-20 border-white/20 bg-transparent text-xs text-white sm:w-32">
+                      <SelectValue placeholder="Server">
+                        {(() => {
+                          const selected = currentSources.find(
+                            (source) => source.embed_url === selectedQuality,
+                          );
+                          return selected ? getSourceLabel(selected) : "Server";
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...currentSources]
+                        .sort((a, b) => b.resolution - a.resolution)
+                        .map((source, index) => (
+                          <SelectItem
+                            key={`${source.embed_url}-${index}`}
+                            value={source.embed_url}
+                            className="text-xs"
+                          >
+                            {getSourceLabel(source)}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white hover:bg-white/15 hover:text-white"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? "Restore player layout" : "Expand player"}
+                aria-label={isExpanded ? "Restore player layout" : "Expand player"}
+              >
+                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-7 w-7 hover:bg-white/15 hover:text-white ${isFocused ? "text-primary" : "text-white"}`}
+                onClick={() => setIsFocused(!isFocused)}
+                title={isFocused ? "Exit focus" : "Focus mode"}
+                aria-label={isFocused ? "Exit focus" : "Focus mode"}
+              >
+                <Focus className="h-4 w-4" />
+              </Button>
             </div>
+            {(totalEpisodes === 0 || episodeNum < totalEpisodes) && (
+              <Link href={`/watch/${id}/${episodeNum + 1}`} className="justify-self-end">
+                <Button variant="ghost" size="sm" className="h-8 w-8 gap-1 text-muted-foreground hover:text-foreground sm:w-auto">
+                  <span className="hidden sm:inline">Next</span>
+                  <SkipForward className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
-
         {/* Right: Episode List */}
-        <div className="w-full lg:w-64 flex-shrink-0 space-y-3">
+        <div className={`w-full min-w-0 space-y-3 ${isExpanded ? "order-3 lg:col-start-2 lg:row-start-2" : "order-2 lg:col-start-2 lg:row-start-1"}`}>
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-medium shrink-0">Episodes</h3>
             <div className="relative flex items-center">
@@ -930,13 +753,19 @@ export default function WatchPage({ params }: WatchPageProps) {
                     <Button
                       variant={ep === episodeNum ? "default" : "ghost"}
                       size="sm"
-                      className={`w-full h-8 text-xs hover:cursor-pointer ${
+                      className={`relative w-full h-8 overflow-hidden text-xs hover:cursor-pointer ${
                         ep === episodeNum
                           ? "bg-primary"
                           : "bg-muted/50 hover:bg-muted"
                       } ${highlightedEp === ep ? "animate-pulse ring-2 ring-primary" : ""}`}
                     >
                       {ep}
+                      {getProgressPercent(ep, allEpisodes.find((item) => item.episode === ep)) > 0 && (
+                        <span
+                          className={`absolute bottom-0 left-0 h-0.5 ${ep === episodeNum ? "bg-primary-foreground" : "bg-primary"}`}
+                          style={{ width: `${getProgressPercent(ep, allEpisodes.find((item) => item.episode === ep))}%` }}
+                        />
+                      )}
                     </Button>
                   </Link>
                 ))}
@@ -947,36 +776,61 @@ export default function WatchPage({ params }: WatchPageProps) {
           {/* Episode List View (with titles) */}
           {episodeListView === "list" && (
             <ScrollArea
-              className={
-                isExpanded
-                  ? "h-[250px] sm:h-[400px] lg:h-[500px]"
-                  : "h-[200px] sm:h-[300px] lg:h-[340px]"
-              }
+              className="w-full"
+              style={{ height: `${Math.max(1, Math.min(6, getEpisodesInRange().length)) * 88 + 4}px` }}
             >
-              <div className="flex flex-col gap-1 pr-2">
+              <div className="flex flex-col gap-2 px-1.5 py-1.5 pr-3">
                 {(episodeSort === "asc"
                   ? getEpisodesInRange()
                   : [...getEpisodesInRange()].reverse()
                 ).map((ep) => {
+                  const info = allEpisodes.find((item) => item.episode === ep);
                   const title = getEpisodeTitleByNum(ep);
-                  const hasTitle = title !== `Episode ${ep}`;
+                  const displayTitle = title === `Episode ${ep}` ? title : `${ep}. ${title}`;
+                  const progress = getProgressPercent(ep, info);
                   return (
-                    <Link key={ep} href={`/watch/${id}/${ep}`} id={`ep-${ep}`}>
-                      <Button
-                        variant={ep === episodeNum ? "default" : "ghost"}
-                        size="sm"
-                        className={`w-full h-9 text-xs justify-start px-2 overflow-hidden hover:cursor-pointer ${
-                          ep === episodeNum
-                            ? "bg-primary"
-                            : "bg-muted/50 hover:bg-muted"
-                        } ${highlightedEp === ep ? "animate-pulse ring-2 ring-primary" : ""}`}
-                        title={hasTitle ? `${ep}. ${title}` : `Episode ${ep}`}
-                      >
-                        <span className="font-bold shrink-0">{ep}.</span>
-                        {hasTitle && (
-                          <span className="ml-1 truncate">{title}</span>
+                    <Link
+                      key={ep}
+                      href={`/watch/${id}/${ep}`}
+                      id={`ep-${ep}`}
+                      aria-current={ep === episodeNum ? "page" : undefined}
+                      className={`group relative block h-20 overflow-hidden rounded-md bg-muted/50 transition-colors hover:bg-muted ${ep === episodeNum ? "ring-1 ring-zinc-500" : ""} ${highlightedEp === ep ? "animate-pulse ring-2 ring-primary" : ""}`}
+                    >
+                      <div className="flex h-full gap-2 p-1.5">
+                        {info?.image?.startsWith("https://artworks.thetvdb.com/") && (
+                          <div className="relative w-20 shrink-0 overflow-hidden rounded">
+                            <Image src={info.image} alt="" fill sizes="80px" className="object-cover" />
+                          </div>
                         )}
-                      </Button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="line-clamp-1 text-xs font-semibold group-hover:text-primary">
+                              {displayTitle}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+                              {info?.has_sub && <Captions className="h-3.5 w-3.5" aria-label="Subtitles available" />}
+                              {info?.has_dub && <Mic2 className="h-3.5 w-3.5" aria-label="Dub available" />}
+                            </span>
+                          </div>
+                          {info?.description && (
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                              {info.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {progress > 0 && (
+                        <div
+                          role="progressbar"
+                          aria-label={`Episode ${ep} watched`}
+                          aria-valuenow={progress}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          className="absolute inset-x-0 bottom-0 h-0.5 bg-muted"
+                        >
+                          <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+                        </div>
+                      )}
                     </Link>
                   );
                 })}
@@ -984,6 +838,95 @@ export default function WatchPage({ params }: WatchPageProps) {
             </ScrollArea>
           )}
         </div>
+
+      {anime && (
+        <section className={`min-w-0 ${isExpanded ? "order-2 lg:col-start-1 lg:row-start-2" : "order-3 pt-6 lg:col-start-1 lg:row-start-2"}`}>
+          <div className="min-w-0 space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="relative h-44 w-32 shrink-0 overflow-hidden rounded-md bg-muted">
+                <Image
+                  src={anime.images.jpg.large_image_url || anime.images.jpg.image_url}
+                  alt={getTitle(anime)}
+                  fill
+                  sizes="128px"
+                  className="object-cover"
+                />
+              </div>
+              <div className="min-w-0 space-y-2">
+                <h2 className="text-lg font-bold">{getTitle(anime)}</h2>
+                {anime.title_japanese && (
+                  <p className="text-xs text-muted-foreground">{anime.title_japanese}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {anime.type && <span>{anime.type}</span>}
+                  {anime.status && <span className={anime.airing ? "text-green-500" : "text-muted-foreground"}>{anime.status}</span>}
+                  {anime.year && <span>{anime.year}</span>}
+                  {!!anime.episodes && <span>{anime.episodes} episodes</span>}
+                </div>
+                <div className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+                  {anime.season && anime.year && <span>Season: {anime.season.charAt(0).toUpperCase() + anime.season.slice(1)} {anime.year}</span>}
+                  {anime.duration && <span>Duration: {anime.duration.replace(" per ep", "")}</span>}
+                  {anime.score && <span>MAL Score: {anime.score.toFixed(2)}</span>}
+                  {!!anime.studios?.length && <span className="truncate">Studio: {anime.studios.map((studio) => studio.name).join(", ")}</span>}
+                </div>
+                {!!anime.genres?.length && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {anime.genres.map((genre, index) => (
+                      <Badge key={`${genre.mal_id ?? genre.name}-${index}`} variant="outline" className="text-[11px]">
+                        {genre.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            {anime.synopsis && (
+              <div className="space-y-2">
+                <p className={`text-sm leading-relaxed text-muted-foreground ${!showFullSynopsis && isSynopsisLong ? "line-clamp-3" : ""}`}>
+                  {anime.synopsis}
+                </p>
+                {isSynopsisLong && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullSynopsis((shown) => !shown)}
+                    aria-expanded={showFullSynopsis}
+                    className="cursor-pointer text-sm font-medium text-primary hover:underline"
+                  >
+                    {showFullSynopsis ? "- Less" : "+ More"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+        </section>
+      )}
+
+      {relatedAnime.length > 0 && (
+            <aside className={`order-4 min-w-0 space-y-3 ${isExpanded ? "lg:col-start-2 lg:row-start-3" : "pt-6 lg:col-start-2 lg:row-start-2"}`} aria-labelledby="related-anime-heading">
+              <h2 id="related-anime-heading" className="text-base font-semibold">Related Anime</h2>
+              <div className="max-h-[440px] space-y-2 overflow-y-auto pr-1">
+                {relatedAnime.map((entry) => (
+                  <Link
+                    key={`${entry.relation}-${entry.mal_id}`}
+                    href={`/anime/${entry.mal_id}`}
+                    className="group flex min-w-0 items-center gap-3 rounded-md bg-muted/50 p-2 transition-colors hover:bg-muted"
+                  >
+                    {entry.image && (
+                      <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded bg-muted">
+                        <Image src={entry.image} alt="" fill sizes="48px" className="object-cover" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold group-hover:text-primary">{entry.name}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{entry.relation}</p>
+                    </div>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </Link>
+                ))}
+              </div>
+            </aside>
+      )}
       </div>
     </div>
   );
@@ -994,43 +937,21 @@ function WatchSkeleton() {
     <div className="space-y-4 mt-6 mb-10 px-4 md:px-10 lg:px-20">
       <Skeleton className="h-5 w-64" />
       <div className="flex flex-col lg:flex-row lg:items-start gap-4 mt-10">
-        {/* Info - Only on 2xl */}
-        <div className="hidden 2xl:block 2xl:w-72 flex-shrink-0 space-y-3">
-          <Skeleton className="aspect-[3/4] w-[120px] mx-auto rounded-lg" />
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <div className="flex gap-1.5">
-            <Skeleton className="h-5 w-12" />
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="h-5 w-10" />
-          </div>
-          <Skeleton className="h-16 w-full" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-          </div>
-        </div>
         {/* Video */}
         <div className="flex-1 min-w-0 space-y-3">
           <Skeleton
             className="w-full rounded-lg"
             style={{ aspectRatio: "16/9" }}
           />
-          {/* Video Controls */}
-          <div className="flex flex-wrap items-center justify-center gap-2 py-2">
-            <Skeleton className="hidden lg:block h-8 w-20" />
-            <div className="flex items-center justify-center gap-2">
-              <Skeleton className="h-7 w-20" />
-              <Skeleton className="h-7 w-20" />
+          <div className="flex items-center justify-between gap-1">
+            <Skeleton className="h-8 w-12" />
+            <div className="flex gap-1">
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-8 w-8" />
+            <Skeleton className="h-8 w-8" />
             </div>
-            <div className="hidden lg:flex items-center gap-1">
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="h-8 w-16" />
-            </div>
-            <Skeleton className="hidden lg:block h-8 w-20" />
+            <Skeleton className="h-8 w-12" />
           </div>
         </div>
         {/* Episodes */}
@@ -1044,11 +965,27 @@ function WatchSkeleton() {
             </div>
           </div>
           <Skeleton className="h-8 w-full" />
-          <div className="grid grid-cols-5 gap-1.5">
-            {Array.from({ length: 25 }).map((_, i) => (
-              <Skeleton key={i} className="h-8" />
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
+        </div>
+      </div>
+      <div className="grid gap-6 pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,25rem)]">
+        <div className="flex gap-4">
+          <Skeleton className="h-44 w-32 shrink-0" />
+          <div className="flex-1 space-y-3">
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-36" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
         </div>
       </div>
     </div>

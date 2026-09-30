@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from app.scrapers.animex import get_episode_sources, get_media
+from app.scrapers.animex import get_animex_episodes, get_episode_sources, get_media
 from app.scrapers.mal import scrape_all_episodes, scrape_anime_details, scrape_episode
 
 router = APIRouter(prefix="/api", tags=["Watch"])
@@ -53,6 +53,9 @@ async def animex_info(mal_id: int):
 
 @router.get("/anime/{mal_id}/episodes")
 async def get_episodes(mal_id: int):
-    """Get numbered episodes from MyAnimeList."""
-    episodes = await scrape_all_episodes(mal_id)
+    """Get AnimeX episode titles with MAL episode-page fallback."""
+    media = await get_media(mal_id)
+    episodes = await get_animex_episodes(mal_id, media) if media else []
+    if not any(episode.get("title") for episode in episodes):
+        episodes = await scrape_all_episodes(mal_id)
     return {"mal_id": mal_id, "total": len(episodes), "episodes": episodes}

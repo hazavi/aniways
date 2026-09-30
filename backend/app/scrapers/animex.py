@@ -51,6 +51,75 @@ async def get_media(mal_id: int) -> dict | None:
     return None
 
 
+async def get_animex_episodes(mal_id: int, media: dict) -> list[dict]:
+    """Read AnimeX's numbered episode metadata for a MAL anime."""
+    key = f"animex:episodes:{mal_id}"
+    if cached := cache.get(key, settings.CACHE_TTL_LONG):
+        return cached
+
+    title = media.get("title") or {}
+    slug = _slug(title.get("english") or title.get("romaji") or "anime")
+    try:
+        page = await get_client().get(
+            f"https://animex.one/anime/{slug}-{media['id']}",
+            follow_redirects=True,
+        )
+        page.raise_for_status()
+        match = _MEDIA_SLUG.search(page.text)
+        if not match:
+            return []
+
+        response = await get_client().get(
+            "https://pp.animex.one/rest/api/episodes",
+            params={"id": match.group(1)},
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, list):
+            return []
+
+        found = {}
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            number = item.get("number")
+            if not isinstance(number, int) or isinstance(number, bool) or number < 1:
+                continue
+            titles = item.get("titles") or {}
+            if not isinstance(titles, dict):
+                titles = {}
+            found[number] = {
+                "mal_id": mal_id,
+                "episode": number,
+                "title": titles.get("en") or None,
+                "title_japanese": titles.get("ja") or None,
+                "title_romanji": titles.get("x-jat") or None,
+                "aired": item.get("airDateUtc"),
+                "filler": bool(item.get("isFiller")),
+                "recap": False,
+                "has_sub": item.get("hasSub") is True,
+                "has_dub": item.get("hasDub") is True,
+                "image": item.get("img"),
+                "description": item.get("description"),
+                "duration": item.get("length") * 60 if isinstance(item.get("length"), (int, float)) else None,
+            }
+
+        count = max(media.get("episodes") or 0, max(found, default=0))
+        episodes = [found.get(number) or {
+            "mal_id": mal_id, "episode": number, "title": None,
+            "title_japanese": None, "title_romanji": None, "aired": None,
+            "filler": False, "recap": False,
+            "has_sub": False, "has_dub": False, "image": None,
+            "description": None, "duration": None,
+        } for number in range(1, count + 1)]
+        if found:
+            cache.set(key, episodes)
+        return episodes
+    except Exception as exc:
+        logger.warning("AnimeX episode metadata failed for MAL %s: %s", mal_id, exc)
+        return []
+
+
 async def get_episode_sources(media: dict, episode: int) -> list[dict]:
     """Read AnimeX's per-episode Sub/Dub servers and ZEN embed."""
     if episode < 1 or (media.get("episodes") and episode > media["episodes"]):
