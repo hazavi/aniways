@@ -15,6 +15,12 @@ const categoryConfig: Record<
   string,
   { title: string; status?: string; order_by: string; sort: string }
 > = {
+  airing: {
+    title: "Airing Now",
+    status: "airing",
+    order_by: "popularity",
+    sort: "asc",
+  },
   "new-releases": {
     title: "New Releases",
     status: "airing",

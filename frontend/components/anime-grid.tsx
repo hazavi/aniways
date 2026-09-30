@@ -46,15 +46,17 @@ interface AnimeGridSkeletonProps {
   count?: number;
   title?: string;
   compact?: boolean;
+  embedded?: boolean;
 }
 
 export function AnimeGridSkeleton({
   count = 12,
   title,
   compact = false,
+  embedded = false,
 }: AnimeGridSkeletonProps) {
   return (
-    <section className="space-y-10 mt-10 px-4 md:px-10 lg:px-20">
+    <section className={embedded ? "space-y-4" : "space-y-10 mt-10 px-4 md:px-10 lg:px-20"}>
       {title && <h2 className="text-2xl font-bold">{title}</h2>}
       <div
         className={

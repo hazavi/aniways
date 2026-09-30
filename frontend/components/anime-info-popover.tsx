@@ -185,9 +185,9 @@ export function AnimeInfoPopover({
                   {anime.genres && anime.genres.length > 0 && (
                     <p className="flex items-center gap-1 flex-wrap">
                       <span className="text-sm">Genres: </span>
-                      {anime.genres.map((g) => (
+                      {anime.genres.map((g, index) => (
                         <span
-                          key={g.mal_id}
+                          key={`${g.mal_id ?? g.name}-${index}`}
                           className="text-white font-medium bg-black/100 px-1.5 py-0.5 rounded-lg text-xs"
                         >
                           {g.name}

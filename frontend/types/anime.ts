@@ -75,6 +75,7 @@ export interface WatchResponse {
   mal_id: number;
   title: string;
   episode: number;
+  total_episodes?: number;
   episode_info?: EpisodeInfo;
   uuid: string;
   session: string;
