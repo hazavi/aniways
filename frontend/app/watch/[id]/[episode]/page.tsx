@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { api, type VideoSource, type Anime, type EpisodeInfo } from "@/lib/api";
-import { saveWatchProgress } from "@/lib/watch-history";
+import { getEpisodeWatchProgress, saveWatchProgress, type WatchHistoryItem } from "@/lib/watch-history";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -40,6 +40,9 @@ import {
   Maximize2,
   Minimize2,
   Focus,
+  ChevronRight,
+  Captions,
+  Mic2,
 } from "lucide-react";
 
 interface WatchPageProps {
@@ -62,6 +65,7 @@ export default function WatchPage({ params }: WatchPageProps) {
   const [anime, setAnime] = useState<Anime | null>(null);
   const [episodeInfo, setEpisodeInfo] = useState<EpisodeInfo | null>(null);
   const [allEpisodes, setAllEpisodes] = useState<EpisodeInfo[]>([]);
+  const [episodeProgress, setEpisodeProgress] = useState<Record<number, WatchHistoryItem>>({});
   const [episodeListView, setEpisodeListView] = useState<"grid" | "list">(
     "list",
   );
@@ -83,6 +87,18 @@ export default function WatchPage({ params }: WatchPageProps) {
   const watchTimeRef = useRef(startTime);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastSavedTimeRef = useRef(0);
+
+  useEffect(() => {
+    watchTimeRef.current = startTime;
+    lastSavedTimeRef.current = 0;
+    setWatchTime(startTime);
+  }, [malId, episodeNum, startTime]);
+
+  useEffect(() => {
+    setEpisodeProgress(Object.fromEntries(
+      getEpisodeWatchProgress(malId).map((item) => [item.episode, item]),
+    ));
+  }, [malId]);
 
   // Keep watch progress and the outer server picker in sync with the embedded player.
   useEffect(() => {
@@ -150,21 +166,25 @@ export default function WatchPage({ params }: WatchPageProps) {
       anime.images?.jpg?.large_image_url ||
       "/placeholder.png";
 
+    const episodeDuration = allEpisodes.find((item) => item.episode === episodeNum)?.duration || DEFAULT_DURATION;
+
     const saveProgress = (timestamp: number) => {
       // Only save if time has changed by at least 5 seconds
       if (Math.abs(timestamp - lastSavedTimeRef.current) < 5) return;
       lastSavedTimeRef.current = timestamp;
 
-      saveWatchProgress({
+      const item = {
         malId,
         episode: episodeNum,
         timestamp,
-        duration: DEFAULT_DURATION,
+        duration: episodeDuration,
         animeTitle: anime.title || "",
         animeTitleEnglish: anime.title_english,
         imageUrl,
         lastWatched: Date.now(),
-      });
+      };
+      saveWatchProgress(item);
+      setEpisodeProgress((progress) => ({ ...progress, [episodeNum]: item }));
     };
 
     // Save progress every 10 seconds based on actual watchTime from player
@@ -195,7 +215,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       // Save final progress on cleanup
       saveProgress(watchTimeRef.current);
     };
-  }, [anime, selectedQuality, malId, episodeNum]);
+  }, [anime, selectedQuality, malId, episodeNum, allEpisodes]);
 
   // Set page title
   useEffect(() => {
@@ -311,6 +331,15 @@ export default function WatchPage({ params }: WatchPageProps) {
     const ep = allEpisodes.find((e) => e.episode === epNum);
     if (!ep) return `Episode ${epNum}`;
     return getEpisodeTitle(ep, epNum);
+  };
+
+  const getProgressPercent = (epNum: number, info?: EpisodeInfo) => {
+    const saved = episodeProgress[epNum];
+    const timestamp = epNum === episodeNum
+      ? Math.max(watchTime, saved?.timestamp || 0)
+      : saved?.timestamp || 0;
+    const duration = info?.duration || saved?.duration || DEFAULT_DURATION;
+    return timestamp > 0 ? Math.min(100, Math.round((timestamp / duration) * 100)) : 0;
   };
 
   const fetchData = useCallback(async () => {
@@ -438,6 +467,12 @@ export default function WatchPage({ params }: WatchPageProps) {
   if (loading) {
     return <WatchSkeleton />;
   }
+
+  const relatedAnime = (anime?.relations || []).flatMap((relation) =>
+    (relation.entry || [])
+      .filter((entry) => entry.mal_id && entry.mal_id !== malId)
+      .map((entry) => ({ ...entry, relation: relation.relation })),
+  );
 
   return (
     <div className="space-y-4 mt-6 mb-10 px-4 md:px-10 lg:px-20">
@@ -670,203 +705,108 @@ export default function WatchPage({ params }: WatchPageProps) {
                 </p>
               </div>
             )}
+
           </div>
 
-          <h2 className="text-sm sm:text-base font-semibold">
-            Episode {episodeNum}
-            {getEpisodeTitleByNum(episodeNum) !== `Episode ${episodeNum}` && (
-              <span className="text-muted-foreground font-normal">: {getEpisodeTitleByNum(episodeNum)}</span>
-            )}
-          </h2>
-
-          {/* Video Controls */}
-          <div className="py-2">
-            {/* Mobile: Stack controls, Desktop: Single row */}
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {/* Previous - Hidden on mobile */}
-              <div className="hidden lg:block">
-                {episodeNum > 1 && (
-                  <Link href={`/watch/${id}/${episodeNum - 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 gap-1.5 text-muted-foreground hover:text-foreground hover:cursor-pointer"
+            <div className="mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-white/15 bg-black/80 p-1 text-white">
+              {sources.length > 0 && (
+                <>
+                  <div className="flex shrink-0 overflow-hidden rounded-md border border-white/20">
+                    <button
+                      type="button"
+                      aria-label="Subtitled servers"
+                      onClick={() => handleServerChange("sub")}
+                      disabled={subSources.length === 0}
+                      className={`px-2 py-1.5 text-[11px] font-semibold disabled:opacity-40 ${selectedServer === "sub" ? "bg-primary text-primary-foreground" : "hover:bg-white/15"}`}
                     >
-                      <SkipBack className="h-3.5 w-3.5" />
-                      <span className="text-xs">Prev</span>
-                    </Button>
-                  </Link>
-                )}
-              </div>
-
-              {/* Server & Quality - Always visible */}
-              <div className="flex-shrink-0">
-                {sources.length > 0 && (
-                  <div className="flex items-center justify-center gap-2">
-                    {/* Server Toggle */}
-                    <div className="flex rounded-lg overflow-hidden border border-border">
+                      SUB
+                    </button>
+                    {dubSources.length > 0 && (
                       <button
-                        className={`px-3 py-1 text-xs font-medium transition-all hover:cursor-pointer ${
-                          selectedServer === "sub"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        }`}
-                        onClick={() => handleServerChange("sub")}
-                        disabled={subSources.length === 0}
+                        type="button"
+                        aria-label="Dubbed servers"
+                        onClick={() => handleServerChange("dub")}
+                        className={`border-l border-white/20 px-2 py-1.5 text-[11px] font-semibold ${selectedServer === "dub" ? "bg-primary text-primary-foreground" : "hover:bg-white/15"}`}
                       >
-                        SUB
+                        DUB
                       </button>
-                      {dubSources.length > 0 && (
-                        <button
-                          className={`px-3 py-1 text-xs font-medium border-l border-border transition-all hover:cursor-pointer ${
-                            selectedServer === "dub"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                          }`}
-                          onClick={() => handleServerChange("dub")}
-                        >
-                          DUB
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Server or quality choice */}
-                    <Select
-                      value={selectedQuality || ""}
-                      onValueChange={(url) => {
-                        setSelectedQuality(url);
-                        setPlayerUrl(url);
-                      }}
-                    >
-                      <SelectTrigger className="w-36 h-7 text-xs">
-                        <SelectValue placeholder="Server">
-                          {(() => {
-                            const selected = currentSources.find(
-                              (s) => s.embed_url === selectedQuality,
-                            );
-                            return selected ? getSourceLabel(selected) : "Server";
-                          })()}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currentSources
-                          .sort((a, b) => b.resolution - a.resolution)
-                          .map((source, index) => (
-                            <SelectItem
-                              key={`${source.resolution}-${index}`}
-                              value={source.embed_url}
-                              className="text-xs hover:cursor-pointer"
-                            >
-                              {getSourceLabel(source)}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              {/* Expand & Focus buttons */}
-              <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 gap-1 text-muted-foreground hover:text-foreground hover:cursor-pointer"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  title={isExpanded ? "Show info" : "Expand player"}
-                >
-                  {isExpanded ? (
-                    <Minimize2 className="h-4 w-4" />
-                  ) : (
-                    <Maximize2 className="h-4 w-4" />
-                  )}
-                  <span className="text-xs">Expand</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`h-8 px-2 gap-1 hover:cursor-pointer ${isFocused ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                  onClick={() => setIsFocused(!isFocused)}
-                  title={isFocused ? "Exit focus" : "Focus mode"}
-                >
-                  <Focus className="h-4 w-4" />
-                  <span className="text-xs">Focus</span>
-                </Button>
-              </div>
-
-              {/* Next - Hidden on mobile */}
-              <div className="hidden lg:block flex-shrink-0">
-                {(totalEpisodes === 0 || episodeNum < totalEpisodes) && (
-                  <Link href={`/watch/${id}/${episodeNum + 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 gap-1.5 text-muted-foreground hover:text-foreground hover:cursor-pointer"
-                    >
-                      <span className="text-xs">Next</span>
-                      <SkipForward className="h-3.5 w-3.5" />
-                    </Button>
-                  </Link>
-                )}
-              </div>
-
-              {/* Mobile controls row */}
-              <div className="flex lg:hidden items-center justify-between w-full mt-2">
-                {episodeNum > 1 ? (
-                  <Link href={`/watch/${id}/${episodeNum - 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 gap-1"
-                    >
-                      <SkipBack className="h-4 w-4" />
-                      <span className="text-xs">Prev</span>
-                    </Button>
-                  </Link>
-                ) : (
-                  <div className="w-16" />
-                )}
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                  >
-                    {isExpanded ? (
-                      <Minimize2 className="h-4 w-4" />
-                    ) : (
-                      <Maximize2 className="h-4 w-4" />
                     )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-8 w-8 p-0 ${isFocused ? "text-primary" : ""}`}
-                    onClick={() => setIsFocused(!isFocused)}
+                  </div>
+                  <Select
+                    value={selectedQuality || ""}
+                    onValueChange={(url) => {
+                      setSelectedQuality(url);
+                      setPlayerUrl(url);
+                    }}
                   >
-                    <Focus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {totalEpisodes === 0 || episodeNum < totalEpisodes ? (
-                  <Link href={`/watch/${id}/${episodeNum + 1}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 gap-1"
-                    >
-                      <span className="text-xs">Next</span>
-                      <SkipForward className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                ) : (
-                  <div className="w-16" />
-                )}
-              </div>
+                    <SelectTrigger className="h-7 w-32 border-white/20 bg-transparent text-xs text-white">
+                      <SelectValue placeholder="Server">
+                        {(() => {
+                          const selected = currentSources.find(
+                            (source) => source.embed_url === selectedQuality,
+                          );
+                          return selected ? getSourceLabel(selected) : "Server";
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...currentSources]
+                        .sort((a, b) => b.resolution - a.resolution)
+                        .map((source, index) => (
+                          <SelectItem
+                            key={`${source.embed_url}-${index}`}
+                            value={source.embed_url}
+                            className="text-xs"
+                          >
+                            {getSourceLabel(source)}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-white hover:bg-white/15 hover:text-white"
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? "Show info" : "Expand player"}
+                aria-label={isExpanded ? "Show info" : "Expand player"}
+              >
+                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-7 w-7 hover:bg-white/15 hover:text-white ${isFocused ? "text-primary" : "text-white"}`}
+                onClick={() => setIsFocused(!isFocused)}
+                title={isFocused ? "Exit focus" : "Focus mode"}
+                aria-label={isFocused ? "Exit focus" : "Focus mode"}
+              >
+                <Focus className="h-4 w-4" />
+              </Button>
             </div>
+
+          {/* Episode navigation stays below the player. */}
+          <div className="flex items-center justify-between gap-2 py-1">
+            {episodeNum > 1 ? (
+              <Link href={`/watch/${id}/${episodeNum - 1}`}>
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground">
+                  <SkipBack className="h-3.5 w-3.5" />
+                  Prev
+                </Button>
+              </Link>
+            ) : <span />}
+            {(totalEpisodes === 0 || episodeNum < totalEpisodes) && (
+              <Link href={`/watch/${id}/${episodeNum + 1}`}>
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-muted-foreground hover:text-foreground">
+                  Next
+                  <SkipForward className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
-
         {/* Right: Episode List */}
         <div className="w-full lg:w-72 2xl:w-80 flex-shrink-0 space-y-3">
           <div className="flex items-center justify-between gap-2">
@@ -952,13 +892,19 @@ export default function WatchPage({ params }: WatchPageProps) {
                     <Button
                       variant={ep === episodeNum ? "default" : "ghost"}
                       size="sm"
-                      className={`w-full h-8 text-xs hover:cursor-pointer ${
+                      className={`relative w-full h-8 overflow-hidden text-xs hover:cursor-pointer ${
                         ep === episodeNum
                           ? "bg-primary"
                           : "bg-muted/50 hover:bg-muted"
                       } ${highlightedEp === ep ? "animate-pulse ring-2 ring-primary" : ""}`}
                     >
                       {ep}
+                      {getProgressPercent(ep, allEpisodes.find((item) => item.episode === ep)) > 0 && (
+                        <span
+                          className={`absolute bottom-0 left-0 h-0.5 ${ep === episodeNum ? "bg-primary-foreground" : "bg-primary"}`}
+                          style={{ width: `${getProgressPercent(ep, allEpisodes.find((item) => item.episode === ep))}%` }}
+                        />
+                      )}
                     </Button>
                   </Link>
                 ))}
@@ -971,34 +917,62 @@ export default function WatchPage({ params }: WatchPageProps) {
             <ScrollArea
               className={
                 isExpanded
-                  ? "h-[250px] sm:h-[400px] lg:h-[500px]"
-                  : "h-[200px] sm:h-[300px] lg:h-[340px]"
+                  ? "h-[400px] sm:h-[520px] lg:h-[640px]"
+                  : "h-[360px] sm:h-[480px] lg:h-[560px]"
               }
             >
-              <div className="flex flex-col gap-1 pr-2">
+              <div className="flex flex-col gap-2 px-1.5 py-1.5 pr-3">
                 {(episodeSort === "asc"
                   ? getEpisodesInRange()
                   : [...getEpisodesInRange()].reverse()
                 ).map((ep) => {
+                  const info = allEpisodes.find((item) => item.episode === ep);
                   const title = getEpisodeTitleByNum(ep);
-                  const hasTitle = title !== `Episode ${ep}`;
+                  const displayTitle = title === `Episode ${ep}` ? title : `${ep}. ${title}`;
+                  const progress = getProgressPercent(ep, info);
                   return (
-                    <Link key={ep} href={`/watch/${id}/${ep}`} id={`ep-${ep}`}>
-                      <Button
-                        variant={ep === episodeNum ? "default" : "ghost"}
-                        size="sm"
-                        className={`w-full h-auto min-h-9 py-2 text-xs text-left whitespace-normal justify-start px-2 hover:cursor-pointer ${
-                          ep === episodeNum
-                            ? "bg-primary"
-                            : "bg-muted/50 hover:bg-muted"
-                        } ${highlightedEp === ep ? "animate-pulse ring-2 ring-primary" : ""}`}
-                        title={hasTitle ? `${ep}. ${title}` : `Episode ${ep}`}
-                      >
-                        <span className="font-bold shrink-0">{ep}.</span>
-                        {hasTitle && (
-                          <span className="ml-1 break-words">{title}</span>
+                    <Link
+                      key={ep}
+                      href={`/watch/${id}/${ep}`}
+                      id={`ep-${ep}`}
+                      aria-current={ep === episodeNum ? "page" : undefined}
+                      className={`group block overflow-hidden rounded-md bg-muted/50 transition-colors hover:bg-muted ${ep === episodeNum ? "ring-1 ring-zinc-500" : ""} ${highlightedEp === ep ? "animate-pulse ring-2 ring-primary" : ""}`}
+                    >
+                      <div className="flex min-h-16 gap-2 p-1.5">
+                        {info?.image?.startsWith("https://artworks.thetvdb.com/") && (
+                          <div className="relative w-20 shrink-0 overflow-hidden rounded">
+                            <Image src={info.image} alt="" fill sizes="80px" className="object-cover" />
+                          </div>
                         )}
-                      </Button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="line-clamp-1 text-xs font-semibold group-hover:text-primary">
+                              {displayTitle}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+                              {info?.has_sub && <Captions className="h-3.5 w-3.5" aria-label="Subtitles available" />}
+                              {info?.has_dub && <Mic2 className="h-3.5 w-3.5" aria-label="Dub available" />}
+                            </span>
+                          </div>
+                          {info?.description && (
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                              {info.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {progress > 0 && (
+                        <div
+                          role="progressbar"
+                          aria-label={`Episode ${ep} watched`}
+                          aria-valuenow={progress}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          className="h-0.5 bg-muted"
+                        >
+                          <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+                        </div>
+                      )}
                     </Link>
                   );
                 })}
@@ -1007,6 +981,33 @@ export default function WatchPage({ params }: WatchPageProps) {
           )}
         </div>
       </div>
+
+      {relatedAnime.length > 0 && (
+        <section className="space-y-3 pt-4" aria-labelledby="related-anime-heading">
+          <h2 id="related-anime-heading" className="text-base font-semibold">
+            Related anime
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+            {relatedAnime.map((entry) => (
+              <Link
+                key={`${entry.relation}-${entry.mal_id}`}
+                href={`/anime/${entry.mal_id}`}
+                className="group flex min-w-0 items-center justify-between gap-2 rounded-md bg-muted/50 p-2.5 transition-colors hover:bg-muted"
+              >
+                <div className="min-w-0 space-y-1">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {entry.relation}
+                  </Badge>
+                  <p className="truncate text-xs font-medium transition-colors group-hover:text-primary">
+                    {entry.name}
+                  </p>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -1041,18 +1042,11 @@ function WatchSkeleton() {
             className="w-full rounded-lg"
             style={{ aspectRatio: "16/9" }}
           />
-          {/* Video Controls */}
-          <div className="flex flex-wrap items-center justify-center gap-2 py-2">
-            <Skeleton className="hidden lg:block h-8 w-20" />
-            <div className="flex items-center justify-center gap-2">
-              <Skeleton className="h-7 w-20" />
-              <Skeleton className="h-7 w-20" />
-            </div>
-            <div className="hidden lg:flex items-center gap-1">
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="h-8 w-16" />
-            </div>
-            <Skeleton className="hidden lg:block h-8 w-20" />
+          <div className="flex justify-end gap-1">
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-8 w-8" />
+            <Skeleton className="h-8 w-8" />
           </div>
         </div>
         {/* Episodes */}
@@ -1066,9 +1060,9 @@ function WatchSkeleton() {
             </div>
           </div>
           <Skeleton className="h-8 w-full" />
-          <div className="grid grid-cols-5 gap-1.5">
-            {Array.from({ length: 25 }).map((_, i) => (
-              <Skeleton key={i} className="h-8" />
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
         </div>

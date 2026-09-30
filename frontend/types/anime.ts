@@ -69,6 +69,11 @@ export interface EpisodeInfo {
   title_japanese?: string;
   title_romanji?: string;
   aired?: string;
+  has_sub?: boolean;
+  has_dub?: boolean;
+  image?: string;
+  description?: string;
+  duration?: number;
 }
 
 export interface WatchResponse {

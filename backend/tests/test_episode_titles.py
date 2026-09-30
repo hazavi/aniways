@@ -67,7 +67,7 @@ class EpisodeTitleTests(unittest.IsolatedAsyncioTestCase):
             if request.url.host == "pp.animex.one":
                 self.assertEqual(request.url.params["id"], "attack-on-titan-2jqd0")
                 return httpx.Response(200, json=[
-                    {"number": 1, "titles": {"en": "To You, 2000 Years in the Future", "ja": "二千年後の君へ", "x-jat": "Nisen-nengo no Kimi e"}, "airDateUtc": "2013-04-06T15:30:00Z", "isFiller": False},
+                    {"number": 1, "titles": {"en": "To You, 2000 Years in the Future", "ja": "二千年後の君へ", "x-jat": "Nisen-nengo no Kimi e"}, "airDateUtc": "2013-04-06T15:30:00Z", "isFiller": False, "hasSub": True, "hasDub": True, "img": "https://artworks.thetvdb.com/episode.jpg", "description": "The walls are breached.", "length": 26},
                     {"number": 3, "titles": {"en": "Humanity Rises Again"}, "isFiller": True},
                 ])
             raise AssertionError(f"Unexpected request: {request.url}")
@@ -85,7 +85,13 @@ class EpisodeTitleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(episodes[0]["title"], "To You, 2000 Years in the Future")
         self.assertEqual(episodes[0]["title_romanji"], "Nisen-nengo no Kimi e")
         self.assertEqual(episodes[0]["title_japanese"], "二千年後の君へ")
+        self.assertTrue(episodes[0]["has_sub"])
+        self.assertTrue(episodes[0]["has_dub"])
+        self.assertEqual(episodes[0]["image"], "https://artworks.thetvdb.com/episode.jpg")
+        self.assertEqual(episodes[0]["description"], "The walls are breached.")
+        self.assertEqual(episodes[0]["duration"], 1560)
         self.assertIsNone(episodes[1]["title"])
+        self.assertFalse(episodes[1]["has_sub"])
         self.assertTrue(episodes[2]["filler"])
         fallback.assert_not_awaited()
 

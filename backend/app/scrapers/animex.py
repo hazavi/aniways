@@ -97,6 +97,11 @@ async def get_animex_episodes(mal_id: int, media: dict) -> list[dict]:
                 "aired": item.get("airDateUtc"),
                 "filler": bool(item.get("isFiller")),
                 "recap": False,
+                "has_sub": item.get("hasSub") is True,
+                "has_dub": item.get("hasDub") is True,
+                "image": item.get("img"),
+                "description": item.get("description"),
+                "duration": item.get("length") * 60 if isinstance(item.get("length"), (int, float)) else None,
             }
 
         count = max(media.get("episodes") or 0, max(found, default=0))
@@ -104,6 +109,8 @@ async def get_animex_episodes(mal_id: int, media: dict) -> list[dict]:
             "mal_id": mal_id, "episode": number, "title": None,
             "title_japanese": None, "title_romanji": None, "aired": None,
             "filler": False, "recap": False,
+            "has_sub": False, "has_dub": False, "image": None,
+            "description": None, "duration": None,
         } for number in range(1, count + 1)]
         if found:
             cache.set(key, episodes)
