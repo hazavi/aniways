@@ -288,9 +288,13 @@ export default function WatchPage({ params }: WatchPageProps) {
   useEffect(() => {
     let active = true;
     setAllEpisodes([]);
+    setTotalEpisodes(0);
     api.getEpisodes(malId)
       .then((res) => {
-        if (active) setAllEpisodes(res.episodes || []);
+        if (active) {
+          setAllEpisodes(res.episodes || []);
+          setTotalEpisodes((count) => Math.max(count, res.total || 0));
+        }
       })
       .catch((err) => console.error("Failed to fetch episode titles:", err));
     return () => {
@@ -323,7 +327,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       if (animeRes.data) {
         setAnime(animeRes.data);
         // Initial episode count from MAL (may be 0 for ongoing)
-        setTotalEpisodes(animeRes.data.episodes || 0);
+        setTotalEpisodes((count) => Math.max(count, animeRes.data.episodes || 0));
       }
     } catch (err) {
       console.error("Failed to fetch MAL data:", err);
@@ -333,7 +337,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       const watchRes = await api.getWatchSources(malId, episodeNum);
       setSources(watchRes.sources || []);
       if (watchRes.total_episodes && watchRes.total_episodes > 0) {
-        setTotalEpisodes(watchRes.total_episodes);
+        setTotalEpisodes((count) => Math.max(count, watchRes.total_episodes || 0));
       }
 
       // Set episode info
@@ -386,9 +390,12 @@ export default function WatchPage({ params }: WatchPageProps) {
   // Calculate episode ranges for dropdown
   const getEpisodeRanges = () => {
     const ranges = [];
-    // Use totalEpisodes if available, otherwise use current episode + buffer
+    // Include every episode returned by the title endpoint, even if another
+    // provider reports a smaller count.
     const maxEp =
-      totalEpisodes > 0 ? totalEpisodes : Math.max(episodeNum + 100, 100);
+      totalEpisodes > 0 || allEpisodes.length > 0
+        ? Math.max(totalEpisodes, allEpisodes.length, episodeNum)
+        : Math.max(episodeNum + 100, 100);
     for (let i = 0; i < maxEp; i += 100) {
       const start = i + 1;
       const end = Math.min(i + 100, maxEp);
@@ -408,7 +415,9 @@ export default function WatchPage({ params }: WatchPageProps) {
     const episodes = [];
     // Use totalEpisodes to limit the range
     const maxEp =
-      totalEpisodes > 0 ? totalEpisodes : Math.max(episodeNum + 100, end);
+      totalEpisodes > 0 || allEpisodes.length > 0
+        ? Math.max(totalEpisodes, allEpisodes.length, episodeNum)
+        : Math.max(episodeNum + 100, end);
     for (let i = start; i <= Math.min(end, maxEp); i++) {
       episodes.push(i);
     }
@@ -418,11 +427,13 @@ export default function WatchPage({ params }: WatchPageProps) {
   // Set initial episode range based on current episode when totalEpisodes changes
   useEffect(() => {
     const maxEp =
-      totalEpisodes > 0 ? totalEpisodes : Math.max(episodeNum + 100, 100);
+      totalEpisodes > 0 || allEpisodes.length > 0
+        ? Math.max(totalEpisodes, allEpisodes.length, episodeNum)
+        : Math.max(episodeNum + 100, 100);
     const rangeStart = Math.floor((episodeNum - 1) / 100) * 100 + 1;
     const rangeEnd = Math.min(rangeStart + 99, maxEp);
     setEpisodeRange(`${rangeStart}-${rangeEnd}`);
-  }, [totalEpisodes, episodeNum]);
+  }, [totalEpisodes, allEpisodes.length, episodeNum]);
 
   if (loading) {
     return <WatchSkeleton />;
