@@ -36,6 +36,7 @@ def _normalize_relations(relations: list[dict]) -> list[dict]:
                 "type": "anime",
                 "name": node.get("title"),
                 "url": f"https://myanimelist.net/anime/{node['id']}",
+                "image": (node.get("main_picture") or {}).get("large") or (node.get("main_picture") or {}).get("medium"),
             }],
         })
     return normalized

@@ -41,7 +41,7 @@ export interface Anime {
   airing?: boolean;
   relations?: {
     relation: string;
-    entry: { mal_id: number; type: string; name: string; url: string }[];
+    entry: { mal_id: number; type: string; name: string; url: string; image?: string }[];
   }[];
 }
 
