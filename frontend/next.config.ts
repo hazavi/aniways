@@ -10,18 +10,6 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "cdn.myanimelist.net",
       },
-      {
-        protocol: "https",
-        hostname: "i.animepahe.ru",
-      },
-       {
-        protocol: "https",
-        hostname: "i.animepahe.si",
-      },
-      {
-        protocol: "https",
-        hostname: "i.animepahe.pw",
-      },
     ],
   },
 };

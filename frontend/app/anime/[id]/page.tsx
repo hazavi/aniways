@@ -52,7 +52,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [characterPage, setCharacterPage] = useState(0);
   const [relationPage, setRelationPage] = useState(0);
-  const [episodeStatus, setEpisodeStatus] = useState<"checking" | "available" | "unavailable" | "blocked">("checking");
+  const [episodeStatus, setEpisodeStatus] = useState<"checking" | "available" | "unavailable">("checking");
   const [loading, setLoading] = useState(true);
   const [loadingRecs, setLoadingRecs] = useState(true);
   const [showFullSynopsis, setShowFullSynopsis] = useState(false);
@@ -61,10 +61,10 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
   const checkEpisodes = useCallback(async () => {
     setEpisodeStatus("checking");
     try {
-      const info = await api.getAnimepaheInfo(parseInt(id));
+      const info = await api.getAnimeXInfo(parseInt(id));
       setEpisodeStatus(info.total_episodes > 0 ? "available" : "unavailable");
-    } catch (error) {
-      setEpisodeStatus(error instanceof Error && error.message.includes("503") ? "blocked" : "unavailable");
+    } catch {
+      setEpisodeStatus("unavailable");
     }
   }, [id]);
 
@@ -101,7 +101,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
           setCharacters([]);
         }
 
-        // Check if episodes are available on Animepahe
+        // Check if AnimeX has a stream for this anime.
         await checkEpisodes();
       } catch (error) {
         console.error("Failed to fetch anime:", error);
@@ -225,10 +225,6 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
                   Watch now
                 </Button>
               </Link>
-            ) : episodeStatus === "blocked" ? (
-              <Button className="gap-2 cursor-pointer" onClick={checkEpisodes}>
-                Retry AnimePahe
-              </Button>
             ) : (
               <Button className="gap-2 cursor-not-allowed" disabled>
                 <Play className="h-4 w-4" />
@@ -245,11 +241,6 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
               totalEpisodes={anime.episodes}
             />
           </div>
-          {episodeStatus === "blocked" && (
-            <p className="text-sm text-muted-foreground" role="status">
-              AnimePahe is blocking stream lookup. Refresh its access cookies, then retry.
-            </p>
-          )}
 
           {/* Synopsis */}
           {anime.synopsis && (

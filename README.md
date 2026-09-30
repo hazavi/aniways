@@ -40,11 +40,11 @@ This project is for educational and personal use only.
 
 ## Overview
 
-Aniways provides anime metadata from MyAnimeList (via Jikan API) and video sources from Animepahe. The backend handles data fetching, caching, and video URL extraction while the frontend delivers a responsive viewing experience.
+Aniways provides anime metadata from the official MyAnimeList v2 API and episode streams from AnimeX. The backend handles data fetching and caching while the frontend delivers a responsive viewing experience.
 
 ### Features
 
-- **Stream Anime** - Watch from Animepahe sources with quality selection
+- **Stream Anime** - Watch AnimeX Sub and Dub servers with in-player quality and subtitle controls
 - **Anime Lists** - Track your anime (Plan to Watch, Watching, Completed, Paused, Dropped)
 - **User Accounts** - Register and login with JWT authentication
 - **Continue Watching** - Resume from where you left off
@@ -61,16 +61,13 @@ aniways/
 │   ├── requirements.txt
 │   └── app/
 │       ├── main.py            # FastAPI application
-│       ├── config.py          # Configuration
-│       ├── dependencies.py    # Dependency injection
+│       ├── core/             # Configuration and shared HTTP client
 │       ├── routes/
-│       │   ├── mal.py         # MAL/Jikan endpoints
-│       │   ├── animepahe.py   # Animepahe endpoints
+│       │   ├── mal.py         # MyAnimeList endpoints
 │       │   └── watch.py       # Video source endpoints
-│       └── services/
-│           ├── mal.py         # Jikan API service
-│           ├── animepahe.py   # Animepahe scraper
-│           └── kwik.py        # Video URL extractor
+│       └── scrapers/
+│           ├── mal.py         # Official MyAnimeList v2 client
+│           └── animex.py      # AnimeX episode servers
 │
 ├── desktop/
 │   ├── main.js                # Electron main process
@@ -115,6 +112,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Copy `.env.example` to `.env` and set `MAL_CLIENT_ID` to your MyAnimeList API client ID.
+
 ### Run
 
 ```bash
@@ -141,19 +140,15 @@ Server runs at `http://localhost:4444`
 | GET /api/seasons/now                | Current season                        |
 | GET /api/schedules                  | Weekly schedule                       |
 | GET /api/watch/{id}/{episode}       | Video sources                         |
-| GET /api/animepahe/latest           | Latest releases                       |
+| GET /api/anime/{id}/animex          | AnimeX availability and episode count |
 | POST /api/auth/register             | Create new account                    |
 | POST /api/auth/login                | Login and get JWT token               |
 | GET /api/list                       | Get user's anime list                 |
 | POST /api/list                      | Add anime to list                     |
 
-### DDoS-Guard Cookies
+### AnimeX Playback
 
-Animepahe requires DDoS-Guard bypass cookies. To update:
-
-1. Visit animepahe.si in browser
-2. Open DevTools > Application > Cookies
-3. POST cookies to `/api/animepahe/cookies`
+Aniways maps MyAnimeList IDs to AnimeX through AniList. The watch route returns available Sub and Dub servers for an episode. The frontend serves the AnimeX player at `/animex-player/` so it can display inside the watch page.
 
 ---
 
@@ -211,8 +206,9 @@ npm start
 - FastAPI - Web framework
 - SQLAlchemy - ORM with SQLite database
 - httpx - Async HTTP client
-- BeautifulSoup4 - HTML parsing
-- Jikan API - MyAnimeList data
+- MyAnimeList v2 API - Anime catalogue data
+- AnimeX - Episode streams
+- AniList - Catalogue ID mapping for playback
 - JWT - User authentication
 
 ### Frontend
@@ -221,7 +217,7 @@ npm start
 - TypeScript - Type safety
 - Tailwind CSS 4 - Styling
 - shadcn/ui - UI components
-- HLS.js - Video streaming
+- AnimeX embedded player - Video playback controls
 
 ### Desktop App
 

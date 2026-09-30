@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api, type Anime } from "@/lib/api";
 import { AnimeGrid, AnimeGridSkeleton } from "@/components/anime-grid";
 import { TopAnimeSidebar } from "@/components/top-anime-sidebar";
-import { LatestReleases } from "@/components/latest-releases";
+import { AiringNow } from "@/components/airing-now";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { ContinueWatching } from "@/components/continue-watching";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,7 +43,7 @@ export default function HomePage() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1 space-y-8 sm:space-y-10">
-            {/* Latest Releases Skeleton */}
+            {/* Airing anime skeleton */}
             <div className="space-y-4">
               <Skeleton className="h-7 w-40" />
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -97,7 +97,7 @@ export default function HomePage() {
         <div className="flex-1 space-y-8 sm:space-y-10">
           <ContinueWatching />
 
-          <LatestReleases />
+          <AiringNow />
 
           <section>
             <div className="flex items-center justify-between mb-4">
