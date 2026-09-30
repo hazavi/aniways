@@ -15,6 +15,8 @@ from app.scrapers.mal import (
     scrape_recommendations,
     scrape_schedule,
     scrape_seasonal_anime,
+    scrape_seasonal_anime_page,
+    scrape_next_season,
     scrape_top_anime,
     search_anime,
 )
@@ -86,15 +88,15 @@ async def search(
 
 # Seasonal
 @router.get("/seasons/now")
-async def get_current_season(limit: int = Query(25, ge=1, le=50)):
+async def get_current_season(page: int = Query(1, ge=1), limit: int = Query(25, ge=1, le=50)):
     """Get current season anime."""
-    return {"data": await scrape_seasonal_anime(limit=limit), "pagination": {"has_next_page": False}}
+    return await scrape_seasonal_anime_page(page=page, limit=limit)
 
 
 @router.get("/seasons/upcoming")
 async def get_upcoming(page: int = Query(1, ge=1), limit: int = Query(25, ge=1, le=50)):
-    """Get upcoming anime."""
-    return await scrape_top_anime("upcoming", limit, None, page)
+    """Get anime from the next calendar season."""
+    return await scrape_next_season(page, limit)
 
 
 @router.get("/seasons/{year}/{season}")

@@ -64,24 +64,26 @@ export function AnimeCard({
           />
 
           {/* CC & Episode badge */}
-          <div
-            className={
-              compact
-                ? "absolute bottom-1.5 right-1.5 flex items-center gap-1"
-                : "absolute bottom-2 right-2 flex items-center gap-1"
-            }
-          >
-            <Badge
+          {(anime.episodes ?? 0) > 0 && (
+            <div
               className={
                 compact
-                  ? "bg-zinc-900/100 text-white text-[10px] px-1 py-0.5 flex items-center gap-0.5"
-                  : "bg-zinc-900/100 text-white text-xs px-1.5 py-0.5 flex items-center gap-1"
+                  ? "absolute bottom-1.5 right-1.5 flex items-center gap-1"
+                  : "absolute bottom-2 right-2 flex items-center gap-1"
               }
             >
-              <span className="text-white">CC</span>
-              <span className="text-purple-400">{anime.episodes || "?"}</span>
-            </Badge>
-          </div>
+              <Badge
+                className={
+                  compact
+                    ? "bg-zinc-900/100 text-white text-[10px] px-1 py-0.5 flex items-center gap-0.5"
+                    : "bg-zinc-900/100 text-white text-xs px-1.5 py-0.5 flex items-center gap-1"
+                }
+              >
+                <span className="text-white">CC</span>
+                <span className="text-purple-400">{anime.episodes}</span>
+              </Badge>
+            </div>
+          )}
         </div>
         <Link href={`/anime/${anime.mal_id}`}>
           <div className={compact ? "mt-1.5" : "mt-2"}>

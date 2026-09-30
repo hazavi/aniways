@@ -35,6 +35,7 @@ class AnimeXTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(info.status_code, 200)
         self.assertEqual(info.json()["total_episodes"], 24)
         self.assertEqual(watch.status_code, 200)
+        self.assertEqual(watch.json()["total_episodes"], 24)
         sources = watch.json()["sources"]
         self.assertEqual([source["server"] for source in sources], ["ANMX Yuki", "ANMX Zuna", "ANMX Yuki", "ANMX Sora", "ZEN"])
         self.assertEqual([source["audio"] for source in sources], ["jpn", "jpn", "eng", "eng", "jpn"])

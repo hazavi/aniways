@@ -325,19 +325,12 @@ export default function WatchPage({ params }: WatchPageProps) {
       console.error("Failed to fetch MAL data:", err);
     }
 
-    // Get AnimeX's episode count.
-    try {
-      const animexRes = await api.getAnimeXInfo(malId);
-      if (animexRes.total_episodes > 0) {
-        setTotalEpisodes(animexRes.total_episodes);
-      }
-    } catch (err) {
-      console.error("Failed to fetch AnimeX info:", err);
-    }
-
     try {
       const watchRes = await api.getWatchSources(malId, episodeNum);
       setSources(watchRes.sources || []);
+      if (watchRes.total_episodes && watchRes.total_episodes > 0) {
+        setTotalEpisodes(watchRes.total_episodes);
+      }
 
       // Set episode info
       if (watchRes.episode_info) {

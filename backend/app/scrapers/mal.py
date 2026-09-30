@@ -128,6 +128,13 @@ def _season_now() -> tuple[int, str]:
     return today.year, ("winter", "spring", "summer", "fall")[(today.month % 12) // 3]
 
 
+def _season_next() -> tuple[int, str]:
+    year, season = _season_now()
+    seasons = ("winter", "spring", "summer", "fall")
+    index = seasons.index(season) + 1
+    return (year + 1 if index == len(seasons) else year), seasons[index % len(seasons)]
+
+
 async def scrape_top_anime(filter_type: str = "airing", limit: int = 10, anime_type: str | None = None, page: int = 1) -> dict:
     """Get MAL's ranked anime lists."""
     key = f"top:{filter_type}:{anime_type}:{limit}:{page}"
@@ -184,15 +191,29 @@ async def search_anime(query: str, page: int = 1, limit: int = 25) -> tuple[list
 
 async def scrape_seasonal_anime(year: int | None = None, season: str | None = None, limit: int = 25) -> list[dict]:
     """Get a MAL seasonal catalogue."""
+    return (await scrape_seasonal_anime_page(year, season, 1, limit))["data"]
+
+
+async def scrape_next_season(page: int = 1, limit: int = 25) -> dict:
+    """Get the next calendar season, including the winter year rollover."""
+    year, season = _season_next()
+    return await scrape_seasonal_anime_page(year, season, page, limit)
+
+
+async def scrape_seasonal_anime_page(year: int | None = None, season: str | None = None, page: int = 1, limit: int = 25) -> dict:
+    """Get one page of a MAL seasonal catalogue."""
     year, season = (year, season) if year and season else _season_now()
-    key = f"seasonal:{year}:{season}:{limit}"
+    key = f"seasonal:{year}:{season}:{page}:{limit}"
     if cached := cache.get(key, settings.CACHE_TTL_SHORT):
         return cached
 
-    result = await _request(f"/anime/season/{year}/{season}", {"limit": min(limit, 100), "fields": _FIELDS})
-    anime = [_normalize(item) for item in (result or {}).get("data", [])]
-    cache.set(key, anime)
-    return anime
+    result = await _request(f"/anime/season/{year}/{season}", {"limit": min(limit, 100), "offset": (page - 1) * limit, "fields": _FIELDS})
+    response = {
+        "data": [_normalize(item) for item in (result or {}).get("data", [])],
+        "pagination": _pagination(result or {}, page),
+    }
+    cache.set(key, response)
+    return response
 
 
 async def scrape_schedule(day: str | None = None, page: int = 1) -> list[dict]:

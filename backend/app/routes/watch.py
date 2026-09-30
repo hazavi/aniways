@@ -24,6 +24,7 @@ async def watch(mal_id: int, episode: int):
         "mal_id": mal_id,
         "title": anime.get("title"),
         "episode": episode,
+        "total_episodes": media.get("episodes") or anime.get("episodes") or 0,
         "episode_info": await scrape_episode(mal_id, episode),
         "uuid": f"animex:{media['id']}",
         "session": str(episode),

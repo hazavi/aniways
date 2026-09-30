@@ -7,7 +7,7 @@ import { api, type Anime } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, Play, Bookmark } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 
 export function HeroCarousel() {
@@ -19,8 +19,12 @@ export function HeroCarousel() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await api.getCurrentSeason(1, 10);
-        setAnime(res.data || []);
+        const res = await api.getTopAnime("airing", 1, 50);
+        setAnime(
+          [...(res.data || [])]
+            .sort((a, b) => (a.popularity ?? Infinity) - (b.popularity ?? Infinity))
+            .slice(0, 10)
+        );
       } catch (error) {
         console.error("Failed to fetch hero anime:", error);
       } finally {
@@ -89,6 +93,9 @@ export function HeroCarousel() {
 
       {/* Content - Left side */}
       <div className="relative z-20 h-full flex flex-col justify-center p-4 sm:p-6 md:p-8 max-w-xl">
+        <span className="text-xs font-semibold uppercase tracking-wider text-purple-400 mb-1">
+          Popular · Airing Now
+        </span>
         {/* Title */}
         <h1
           className="text-xl sm:text-2xl font-bold text-white mb-2 line-clamp-1"
@@ -99,7 +106,7 @@ export function HeroCarousel() {
 
         {/* Badges */}
         <div className="flex flex-wrap items-center gap-1.5 mb-2">
-          {current.episodes && (
+          {(current.episodes ?? 0) > 0 && (
             <Badge
               variant="secondary"
               className="bg-zinc-900/100 text-purple-400 border-0 text-xs px-2 py-0.5"
