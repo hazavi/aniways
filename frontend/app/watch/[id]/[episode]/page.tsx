@@ -516,9 +516,9 @@ export default function WatchPage({ params }: WatchPageProps) {
       )}
 
       {/* Player and episodes */}
-      <div className={`flex flex-col gap-4 lg:mt-10 ${isExpanded ? "lg:flex-col" : "lg:flex-row lg:items-start"}`}>
+      <div className="grid gap-4 lg:mt-10 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,25rem)] lg:items-start">
         {/* Video Player */}
-        <div className="flex-1 min-w-0 space-y-3">
+        <div className={`order-1 min-w-0 space-y-3 ${isExpanded ? "lg:col-span-2" : "lg:col-start-1 lg:row-start-1"}`}>
           <div
             className={`relative w-full bg-black rounded-lg overflow-hidden ${isFocused ? "relative z-50" : ""}`}
             style={{ aspectRatio: "16/9" }}
@@ -636,8 +636,8 @@ export default function WatchPage({ params }: WatchPageProps) {
                 size="icon"
                 className="h-7 w-7 text-white hover:bg-white/15 hover:text-white"
                 onClick={() => setIsExpanded(!isExpanded)}
-                title={isExpanded ? "Show info" : "Expand player"}
-                aria-label={isExpanded ? "Show info" : "Expand player"}
+                title={isExpanded ? "Restore player layout" : "Expand player"}
+                aria-label={isExpanded ? "Restore player layout" : "Expand player"}
               >
                 {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               </Button>
@@ -663,7 +663,7 @@ export default function WatchPage({ params }: WatchPageProps) {
           </div>
         </div>
         {/* Right: Episode List */}
-        <div className={`w-full flex-shrink-0 space-y-3 ${isExpanded ? "" : "lg:w-72 2xl:w-80"}`}>
+        <div className={`w-full min-w-0 space-y-3 ${isExpanded ? "order-3 lg:col-start-2 lg:row-start-2" : "order-2 lg:col-start-2 lg:row-start-1"}`}>
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-medium shrink-0">Episodes</h3>
             <div className="relative flex items-center">
@@ -832,10 +832,9 @@ export default function WatchPage({ params }: WatchPageProps) {
             </ScrollArea>
           )}
         </div>
-      </div>
 
       {anime && (
-        <section className={`grid gap-6 pt-6 ${relatedAnime.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_minmax(18rem,25rem)]" : ""}`}>
+        <section className={`min-w-0 ${isExpanded ? "order-2 lg:col-start-1 lg:row-start-2" : "order-3 pt-6 lg:col-start-1 lg:row-start-2"}`}>
           <div className="min-w-0 space-y-4">
             <div className="flex items-start gap-4">
               <div className="relative h-44 w-32 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -880,8 +879,11 @@ export default function WatchPage({ params }: WatchPageProps) {
             )}
           </div>
 
-          {relatedAnime.length > 0 && (
-            <aside className="min-w-0 space-y-3" aria-labelledby="related-anime-heading">
+        </section>
+      )}
+
+      {relatedAnime.length > 0 && (
+            <aside className={`order-4 min-w-0 space-y-3 ${isExpanded ? "lg:col-start-2 lg:row-start-3" : "pt-6 lg:col-start-2 lg:row-start-2"}`} aria-labelledby="related-anime-heading">
               <h2 id="related-anime-heading" className="text-base font-semibold">Related Anime</h2>
               <div className="max-h-[440px] space-y-2 overflow-y-auto pr-1">
                 {relatedAnime.map((entry) => (
@@ -904,9 +906,8 @@ export default function WatchPage({ params }: WatchPageProps) {
                 ))}
               </div>
             </aside>
-          )}
-        </section>
       )}
+      </div>
     </div>
   );
 }
