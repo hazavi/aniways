@@ -34,13 +34,10 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("en");
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
-    setMounted(true);
     const stored = localStorage.getItem("language") as Language;
     if (stored === "en" || stored === "jp") {
-      setLanguage(stored);
+      queueMicrotask(() => setLanguage(stored));
     }
   }, []);
 

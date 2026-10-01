@@ -13,6 +13,12 @@ All notable changes to this project will be documented in this file.
 
 - Catalogue details use AniDB records; AniList supplies discovery, and AnimeX supplies episode streams.
 - The homepage shows popular airing anime in place of the former release feed.
+- Release builds now verify version consistency and run backend tests and frontend lint before packaging.
+
+### Fixed
+
+- Frontend production builds no longer depend on downloading Google Fonts.
+- Client settings initialization passes the frontend lint checks.
 
 ### Removed
 

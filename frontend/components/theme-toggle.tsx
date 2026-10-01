@@ -14,11 +14,10 @@ export function ThemeToggle() {
     const savedTheme = localStorage.getItem(THEME_KEY);
     if (savedTheme) {
       const isDark = savedTheme === "dark";
-      setDark(isDark);
+      queueMicrotask(() => setDark(isDark));
       document.documentElement.classList.toggle("dark", isDark);
     } else {
       // Default to dark theme
-      setDark(true);
       document.documentElement.classList.add("dark");
     }
   }, []);

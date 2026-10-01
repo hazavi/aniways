@@ -16,7 +16,11 @@ import { ChevronLeft, ChevronRight, X, Play, HelpCircle } from "lucide-react";
 export function ContinueWatching() {
   const [history, setHistory] = useState<WatchHistoryItem[]>([]);
   const [isVisible, setIsVisible] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(() =>
+    typeof window === "undefined"
+      ? true
+      : localStorage.getItem("aniways-continue-watching-expanded") !== "false",
+  );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -30,13 +34,6 @@ export function ContinueWatching() {
     };
     refresh();
     window.addEventListener("aniways-history-migrated", refresh);
-    // Load expanded state from localStorage
-    const savedState = localStorage.getItem(
-      "aniways-continue-watching-expanded",
-    );
-    if (savedState !== null) {
-      setIsExpanded(savedState === "true");
-    }
     return () => window.removeEventListener("aniways-history-migrated", refresh);
   }, []);
 

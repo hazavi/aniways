@@ -21,7 +21,7 @@ export function TitleBar() {
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.electronAPI?.isElectron) {
-      setIsElectron(true);
+      queueMicrotask(() => setIsElectron(true));
 
       // Add class to enable electron-specific styles
       document.documentElement.classList.add("electron");
