@@ -221,11 +221,26 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http") && !url.includes("localhost")) {
+    // Embedded player ads use window.open; never create a new app window or
+    // forward an arbitrary iframe URL to the system browser.
+    if (/^https:\/\/github\.com\/hazavi\/aniways(?:\/|$)/.test(url)) {
       shell.openExternal(url);
-      return { action: "deny" };
     }
-    return { action: "allow" };
+    return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    // Keep player scripts from replacing the Aniways window with an ad page.
+    let destination;
+    try {
+      destination = new URL(url);
+    } catch {
+      event.preventDefault();
+      return;
+    }
+    if (destination.origin !== new URL(`http://localhost:${PORT}`).origin) {
+      event.preventDefault();
+    }
   });
 
   const startUrl = `http://localhost:${PORT}`;

@@ -558,6 +558,7 @@ export default function WatchPage({ params }: WatchPageProps) {
                 className="w-full h-full"
                 title="Episode player"
                 allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-downloads"
                 scrolling="no"
                 allowFullScreen
               />
