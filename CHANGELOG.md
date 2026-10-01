@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - AnimeX Sub and Dub server choices with in-player quality, subtitle, and playback settings.
 - AniDB catalogue with AniDB IDs and no API client ID.
+- A new start-electron.bat launcher checks dependencies, starts the frontend, and opens the desktop app.
 
 ### Changed
 
