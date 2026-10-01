@@ -168,9 +168,11 @@ function createWindow() {
   // Allow images to load from external CDN domains by removing restrictive CSP headers
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const headers = { ...details.responseHeaders };
-    // Remove any Content-Security-Policy that could block external images
-    delete headers["content-security-policy"];
-    delete headers["Content-Security-Policy"];
+    // Keep the player sandbox policy while retaining the existing image behavior.
+    if (!details.url.startsWith(`http://localhost:${PORT}/animex-player/`)) {
+      delete headers["content-security-policy"];
+      delete headers["Content-Security-Policy"];
+    }
     callback({ responseHeaders: headers });
   });
 

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 const PLAYER_ORIGIN = "https://plyr.animex.one";
+const PLAYER_SANDBOX = "sandbox allow-scripts allow-same-origin allow-forms allow-presentation allow-downloads";
 const CONTROL_LAYOUT = `<style id="aniways-player-controls">
   /* Keep the native buttons and their handlers; change only their placement. */
   @media (min-width: 768px) {
@@ -39,6 +40,8 @@ export async function GET(
     if (headers.get("content-type")?.includes("text/html")) {
       const html = (await upstream.text()).replace("</head>", `${CONTROL_LAYOUT}</head>`);
       headers.set("cache-control", "no-store");
+      // Keep popup and top-navigation restrictions after an embedded player reload.
+      headers.set("content-security-policy", PLAYER_SANDBOX);
       headers.delete("etag");
       headers.delete("last-modified");
       return new Response(html, { status: upstream.status, headers });
