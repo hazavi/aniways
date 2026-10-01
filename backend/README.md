@@ -1,15 +1,15 @@
 # Aniways Backend
 
-A FastAPI-based backend for anime streaming, providing catalogue data from the official MyAnimeList v2 API and episode servers from AnimeX.
+A FastAPI backend for anime streaming, with AniDB catalogue data and AnimeX episode servers.
 
 ## Features
 
 - **User Authentication** - JWT-based auth with 30-day token expiry
 - **Anime Lists** - Track anime with status (Plan to Watch, Watching, Completed, Paused, Dropped)
 - **SQLite Database** - Persistent storage with SQLAlchemy ORM
-- **MyAnimeList Integration** - Anime metadata, search, rankings, seasons, and schedules via MAL v2
+- **AniDB Catalogue** - Anime details via animap.id, with AniList discovery for search, rankings, seasons, and schedules
 - **AnimeX Streams** - Sub and Dub server choices for available episodes
-- **AniList ID Mapping** - Connects MyAnimeList IDs to AnimeX titles
+- **AniList ID Mapping** - Connects AniDB IDs to AnimeX titles
 - **Caching** - In-memory TTL cache to reduce API calls
 - **Player Route** - The frontend serves AnimeX's embedded player inside the watch page
 
@@ -62,7 +62,6 @@ Configuration is managed via environment variables with sensible defaults:
 | `DEBUG`         | `false`                   | Enable debug logging and auto-reload |
 | `HOST`          | `127.0.0.1`               | Server bind host                    |
 | `PORT`          | `4444`                    | Server bind port                    |
-| `MAL_CLIENT_ID` | -                         | Required MyAnimeList v2 client ID   |
 | `DATA_DIR`      | `backend/` or `/app/data` | Directory for SQLite database       |
 
 ## Project Structure
@@ -79,7 +78,7 @@ backend/
     ??? utils/
     ?   ??? cache.py       # TTL cache
     ??? scrapers/
-    ?   ??? mal.py         # Official MyAnimeList v2 client
+    ?   ??? anidb.py       # AniDB catalogue client
     ?   ??? animex.py      # AnimeX episode servers
     ??? database/
     ?   ??? database.py    # SQLite connection and sessions
@@ -90,7 +89,7 @@ backend/
     ??? routes/
         ??? auth.py        # Registration and login
         ??? animelist.py   # Personal anime lists
-        ??? mal.py         # MyAnimeList catalogue
+        ??? catalogue.py   # AniDB catalogue
         ??? watch.py       # AnimeX availability and streams
 ```
 
@@ -143,13 +142,13 @@ Header: Authorization: Bearer <token>
 ```
 POST /api/list
 Header: Authorization: Bearer <token>
-Body: {"mal_id": 1, "status": "watching"}
+Body: {"anidb_id": 1, "status": "watching"}
 ```
 
 #### Update List Item
 
 ```
-PUT /api/list/{mal_id}
+PUT /api/list/{anidb_id}
 Header: Authorization: Bearer <token>
 Body: {"status": "completed"}
 ```
@@ -157,13 +156,13 @@ Body: {"status": "completed"}
 #### Remove from List
 
 ```
-DELETE /api/list/{mal_id}
+DELETE /api/list/{anidb_id}
 Header: Authorization: Bearer <token>
 ```
 
 ---
 
-### MAL Endpoints (`/api`)
+### Catalogue Endpoints (`/api`)
 
 #### Top Anime
 
@@ -207,9 +206,9 @@ GET /api/anime?q=naruto&page=1&limit=25
 #### Anime Details
 
 ```
-GET /api/anime/{mal_id}
-GET /api/anime/{mal_id}/recommendations?limit=12
-GET /api/anime/{mal_id}/characters?limit=12
+GET /api/anime/{anidb_id}
+GET /api/anime/{anidb_id}/recommendations?limit=12
+GET /api/anime/{anidb_id}/characters?limit=12
 ```
 
 | Param   | Default | Description        |
@@ -248,7 +247,7 @@ GET /api/schedules?filter=monday&page=1
 #### Availability
 
 ```
-GET /api/anime/{mal_id}/animex
+GET /api/anime/{anidb_id}/animex
 ```
 
 Returns an AnimeX match and episode count when episode 1 has a playable server.
@@ -258,12 +257,12 @@ Returns an AnimeX match and episode count when episode 1 has a playable server.
 #### Watch Episode
 
 ```
-GET /api/watch/{mal_id}/{episode}
+GET /api/watch/{anidb_id}/{episode}
 ```
 
 | Param     | Description          |
 | --------- | -------------------- |
-| `mal_id`  | MyAnimeList anime ID |
+| `anidb_id`  | AniDB anime ID |
 | `episode` | Episode number       |
 
 Returns the available AnimeX Sub and Dub player servers for an episode, including ZEN when offered.
@@ -271,30 +270,30 @@ Returns the available AnimeX Sub and Dub player servers for an episode, includin
 #### Numbered Episodes
 
 ```
-GET /api/anime/{mal_id}/episodes
+GET /api/anime/{anidb_id}/episodes
 ```
 
-Returns numbered episodes from MyAnimeList's published episode count. The public API does not supply episode titles.
+Returns numbered episodes from the AniDB episode count. Episode titles come from AnimeX when available.
 
 ## AnimeX Playback
 
-The backend maps a MyAnimeList ID to AnimeX through AniList, then reads the server list for the requested episode. The frontend serves the native player through `/animex-player/`, allowing its Quality, Subtitles, Settings, and Servers controls to appear in the watch page.
+The backend maps an AniDB ID to AnimeX through AniList, then reads the server list for the requested episode. The frontend serves the native player through `/animex-player/`, allowing its Quality, Subtitles, Settings, and Servers controls to appear in the watch page.
 
-## MyAnimeList API Setup
+## AniDB Setup
 
-Create an API client at MyAnimeList, then set its client ID before starting the backend. Catalogue endpoints use the `X-MAL-CLIENT-ID` header, so no user access token is required.
+No API client ID is needed. AniDB details come from animap.id; AniList supplies search discovery, rankings, seasons, and schedules.
 
-Create `backend/.env` from `backend/.env.example`, then replace its `MAL_CLIENT_ID` value with your registered client ID. The `.env` file is ignored by Git and is loaded automatically when the backend starts.
+You may copy `backend/.env.example` to `backend/.env` to change server settings. Anime links and saved lists use AniDB IDs. On first startup after upgrading, saved-list entries from older versions are copied to a new table using public ID mappings; the previous table remains intact.
 
 ```powershell
 python server.py
 ```
 
-MAL v2 does not expose public anime-character or per-episode-title endpoints. Those responses remain available in the API shape but contain no character or episode-title data.
+Character responses remain empty. Episode titles come from AnimeX when available; otherwise the API returns numbered episodes.
 
 ## Rate Limiting
 
-- **MyAnimeList API**: Uses the registered application's client ID for catalogue requests
+- **AniDB catalogue**: Uses public AniList and animap.id requests; results are cached to limit traffic
 - **AnimeX**: Server choices are requested per episode
 
 ## Caching

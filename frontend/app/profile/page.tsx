@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { resolveImageUrl } from "@/lib/images";
 import { useAuth } from "@/components/auth-provider";
 import { authApi, listApi, AnimeListItem, ListStatus } from "@/lib/auth";
 import { statusIcons } from "@/components/add-to-list-button";
@@ -65,10 +66,10 @@ export default function ProfilePage() {
     }
   };
 
-  const handleRemoveFromList = async (malId: number) => {
+  const handleRemoveFromList = async (anidbId: number) => {
     try {
-      await listApi.removeFromList(malId);
-      setAnimeList((prev) => prev.filter((item) => item.mal_id !== malId));
+      await listApi.removeFromList(anidbId);
+      setAnimeList((prev) => prev.filter((item) => item.anidb_id !== anidbId));
       // Refresh profile stats
       const profileData = await authApi.getProfile();
       setProfile(profileData);
@@ -299,7 +300,7 @@ function AnimeListCard({
   onRemove,
 }: {
   item: AnimeListItem;
-  onRemove: (malId: number) => void;
+  onRemove: (anidbId: number) => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -317,11 +318,11 @@ function AnimeListCard({
       onMouseEnter={() => setShowMenu(true)}
       onMouseLeave={() => setShowMenu(false)}
     >
-      <Link href={`/anime/${item.mal_id}`}>
+      <Link href={`/anime/${item.anidb_id}`}>
         <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted">
           {item.image_url ? (
             <Image
-              src={item.image_url}
+              src={resolveImageUrl(item.image_url)}
               alt={item.title}
               fill
               className="object-cover transition-transform group-hover:scale-105"
@@ -352,7 +353,7 @@ function AnimeListCard({
           className="absolute top-1.5 right-1.5 z-10 h-6 w-6 rounded-full px-1 bg-zinc-900/100 hover:bg-red-600 flex items-center justify-center cursor-pointer transition-colors"
           onClick={(e) => {
             e.preventDefault();
-            onRemove(item.mal_id);
+            onRemove(item.anidb_id);
           }}
           title="Remove from list"
         >

@@ -52,7 +52,7 @@ interface WatchPageProps {
 export default function WatchPage({ params }: WatchPageProps) {
   const { id, episode } = use(params);
   const searchParams = useSearchParams();
-  const malId = parseInt(id);
+  const anidbId = parseInt(id);
   const episodeNum = parseInt(episode);
   const startTime = parseInt(searchParams.get("t") || "0");
 
@@ -91,19 +91,22 @@ export default function WatchPage({ params }: WatchPageProps) {
 
   useEffect(() => {
     setShowFullSynopsis(false);
-  }, [malId]);
+  }, [anidbId]);
 
   useEffect(() => {
     watchTimeRef.current = startTime;
     lastSavedTimeRef.current = 0;
     setWatchTime(startTime);
-  }, [malId, episodeNum, startTime]);
+  }, [anidbId, episodeNum, startTime]);
 
   useEffect(() => {
-    setEpisodeProgress(Object.fromEntries(
-      getEpisodeWatchProgress(malId).map((item) => [item.episode, item]),
+    const refresh = () => setEpisodeProgress(Object.fromEntries(
+      getEpisodeWatchProgress(anidbId).map((item) => [item.episode, item]),
     ));
-  }, [malId]);
+    refresh();
+    window.addEventListener("aniways-history-migrated", refresh);
+    return () => window.removeEventListener("aniways-history-migrated", refresh);
+  }, [anidbId]);
 
   // Keep watch progress and the outer server picker in sync with the embedded player.
   useEffect(() => {
@@ -179,7 +182,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       lastSavedTimeRef.current = timestamp;
 
       const item = {
-        malId,
+        anidbId,
         episode: episodeNum,
         timestamp,
         duration: episodeDuration,
@@ -220,7 +223,7 @@ export default function WatchPage({ params }: WatchPageProps) {
       // Save final progress on cleanup
       saveProgress(watchTimeRef.current);
     };
-  }, [anime, selectedQuality, malId, episodeNum, allEpisodes]);
+  }, [anime, selectedQuality, anidbId, episodeNum, allEpisodes]);
 
   // Set page title
   useEffect(() => {
@@ -314,7 +317,7 @@ export default function WatchPage({ params }: WatchPageProps) {
     let active = true;
     setAllEpisodes([]);
     setTotalEpisodes(0);
-    api.getEpisodes(malId)
+    api.getEpisodes(anidbId)
       .then((res) => {
         if (active) {
           setAllEpisodes(res.episodes || []);
@@ -325,7 +328,7 @@ export default function WatchPage({ params }: WatchPageProps) {
     return () => {
       active = false;
     };
-  }, [malId]);
+  }, [anidbId]);
 
   const toggleEpisodeView = () => {
     setEpisodeListView((view) => view === "grid" ? "list" : "grid");
@@ -355,20 +358,20 @@ export default function WatchPage({ params }: WatchPageProps) {
     setEpisodeInfo(null);
     setError(null);
 
-    // Get anime info from MAL
+    // Get anime info from AniDB
     try {
-      const animeRes = await api.getAnime(malId);
+      const animeRes = await api.getAnime(anidbId);
       if (animeRes.data) {
         setAnime(animeRes.data);
-        // Initial episode count from MAL (may be 0 for ongoing)
+        // Initial episode count from AniDB (may be 0 for ongoing)
         setTotalEpisodes((count) => Math.max(count, animeRes.data.episodes || 0));
       }
     } catch (err) {
-      console.error("Failed to fetch MAL data:", err);
+      console.error("Failed to fetch AniDB data:", err);
     }
 
     try {
-      const watchRes = await api.getWatchSources(malId, episodeNum);
+      const watchRes = await api.getWatchSources(anidbId, episodeNum);
       setSources(watchRes.sources || []);
       if (watchRes.total_episodes && watchRes.total_episodes > 0) {
         setTotalEpisodes((count) => Math.max(count, watchRes.total_episodes || 0));
@@ -411,7 +414,7 @@ export default function WatchPage({ params }: WatchPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [malId, episodeNum]);
+  }, [anidbId, episodeNum]);
 
   useEffect(() => {
     fetchData();
@@ -475,7 +478,7 @@ export default function WatchPage({ params }: WatchPageProps) {
 
   const relatedAnime = (anime?.relations || []).flatMap((relation) =>
     (relation.entry || [])
-      .filter((entry) => entry.mal_id && entry.mal_id !== malId)
+      .filter((entry) => entry.anidb_id && entry.anidb_id !== anidbId)
       .map((entry) => ({ ...entry, relation: relation.relation })),
   );
   const isSynopsisLong = (anime?.synopsis?.length || 0) > 300;
@@ -866,13 +869,13 @@ export default function WatchPage({ params }: WatchPageProps) {
                 <div className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
                   {anime.season && anime.year && <span>Season: {anime.season.charAt(0).toUpperCase() + anime.season.slice(1)} {anime.year}</span>}
                   {anime.duration && <span>Duration: {anime.duration.replace(" per ep", "")}</span>}
-                  {anime.score && <span>MAL Score: {anime.score.toFixed(2)}</span>}
+                  {anime.score && <span>AniList Score: {anime.score.toFixed(2)}</span>}
                   {!!anime.studios?.length && <span className="truncate">Studio: {anime.studios.map((studio) => studio.name).join(", ")}</span>}
                 </div>
                 {!!anime.genres?.length && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {anime.genres.map((genre, index) => (
-                      <Badge key={`${genre.mal_id ?? genre.name}-${index}`} variant="outline" className="text-[11px]">
+                      <Badge key={`${genre.id ?? genre.name}-${index}`} variant="outline" className="text-[11px]">
                         {genre.name}
                       </Badge>
                     ))}
@@ -908,8 +911,8 @@ export default function WatchPage({ params }: WatchPageProps) {
               <div className="max-h-[440px] space-y-2 overflow-y-auto pr-1">
                 {relatedAnime.map((entry) => (
                   <Link
-                    key={`${entry.relation}-${entry.mal_id}`}
-                    href={`/anime/${entry.mal_id}`}
+                    key={`${entry.relation}-${entry.anidb_id}`}
+                    href={`/anime/${entry.anidb_id}`}
                     className="group flex min-w-0 items-center gap-3 rounded-md bg-muted/50 p-2 transition-colors hover:bg-muted"
                   >
                     {entry.image && (

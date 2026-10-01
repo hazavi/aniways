@@ -160,7 +160,7 @@ export function HeroCarousel() {
 
         {/* Buttons */}
         <div className="flex items-center gap-3">
-          <Link href={`/anime/${current.mal_id}`}>
+          <Link href={`/anime/${current.anidb_id}`}>
             <Button className="bg-purple-800 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-full gap-2 text-xs sm:text-sm font-medium hover:cursor-pointer transition">
               <Play className="w-3 h-3 fill-white" />
               Watch Now

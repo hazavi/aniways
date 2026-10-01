@@ -149,7 +149,7 @@ export function TopAnimeSidebar({ className }: TopAnimeSidebarProps) {
             ) : (
               getAnimeList().map((anime, index) => (
                 <TopAnimeItem
-                  key={`${anime.mal_id}-${index}`}
+                  key={`${anime.anidb_id}-${index}`}
                   anime={anime}
                   rank={index + 1}
                 />
@@ -174,7 +174,7 @@ function TopAnimeItem({ anime, rank }: { anime: Anime; rank: number }) {
 
   return (
     <Link
-      href={`/anime/${anime.mal_id}`}
+      href={`/anime/${anime.anidb_id}`}
       className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors group"
     >
       <div

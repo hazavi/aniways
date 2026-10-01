@@ -3,6 +3,7 @@ import type {
   WatchResponse,
   EpisodeInfo,
 } from "@/types";
+import { resolveImageUrl } from "@/lib/images";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:4444";
 
@@ -55,23 +56,32 @@ async function fetchApi<T>(
   return fetchWithRetry<T>(url.toString());
 }
 
-// API endpoints (MyAnimeList catalogue and AnimeX streams)
+// API endpoints (AniDB catalogue and AnimeX streams)
 export const api = {
   // Search anime
   searchAnime: (q: string, page = 1) =>
     fetchApi<{ data: Anime[]; pagination: { last_visible_page: number; has_next_page: boolean } }>("/api/anime", { q, page }),
 
   // Get anime details
-  getAnime: (id: number) => fetchApi<{ data: Anime }>(`/api/anime/${id}`),
-  getAnimeFull: (id: number) => fetchApi<{ data: Anime }>(`/api/anime/${id}/full`),
+  getAnime: async (id: number) => {
+    const result = await fetchApi<{ data: Anime }>(`/api/anime/${id}`);
+    for (const format of ["jpg", "webp"] as const) {
+      const image = result.data.images?.[format];
+      if (image) {
+        image.image_url = resolveImageUrl(image.image_url);
+        image.large_image_url = resolveImageUrl(image.large_image_url);
+      }
+    }
+    return result;
+  },
   
   // Get anime recommendations
   getRecommendations: (id: number, limit = 12) =>
-    fetchApi<{ data: { mal_id: number; title: string; title_english?: string; images: Anime["images"]; votes: number }[] }>(`/api/anime/${id}/recommendations`, { limit }),
+    fetchApi<{ data: { anidb_id: number; title: string; title_english?: string; images: Anime["images"]; votes: number }[] }>(`/api/anime/${id}/recommendations`, { limit }),
 
   // Get anime characters
   getCharacters: (id: number, limit = 12) =>
-    fetchApi<{ data: { mal_id: number; name: string; images: { jpg?: { image_url?: string } }; role: string; voice_actor?: { mal_id: number; name: string; images: { jpg?: { image_url?: string } } } | null }[] }>(`/api/anime/${id}/characters`, { limit }),
+    fetchApi<{ data: { anidb_id: number; name: string; images: { jpg?: { image_url?: string } }; role: string; voice_actor?: { anidb_id: number; name: string; images: { jpg?: { image_url?: string } } } | null }[] }>(`/api/anime/${id}/characters`, { limit }),
 
   // Top anime lists
   getTopAnime: (filter = "airing", page = 1, limit = 24, type?: string) =>
@@ -95,15 +105,15 @@ export const api = {
   getSeason: (year: number, season: string, page = 1, limit = 24) =>
     fetchApi<{ data: Anime[]; pagination: { last_visible_page: number; has_next_page: boolean } }>(`/api/seasons/${year}/${season}`, { page, limit }),
 
-  // AnimeX video sources and availability by MAL ID
-  getWatchSources: (malId: number, episode: number) =>
-    fetchApi<WatchResponse>(`/api/watch/${malId}/${episode}`),
-  getAnimeXInfo: (malId: number) =>
-    fetchApi<{ mal_id: number; title: string; match: { uuid: string; title: string; provider: string }; total_episodes: number }>(`/api/anime/${malId}/animex`),
+  // AnimeX video sources and availability by AniDB ID
+  getWatchSources: (anidbId: number, episode: number) =>
+    fetchApi<WatchResponse>(`/api/watch/${anidbId}/${episode}`),
+  getAnimeXInfo: (anidbId: number) =>
+    fetchApi<{ anidb_id: number; title: string; match: { uuid: string; title: string; provider: string }; total_episodes: number }>(`/api/anime/${anidbId}/animex`),
 
   // Get episode titles from the backend
-  getEpisodes: (malId: number) =>
-    fetchApi<{ mal_id: number; total: number; episodes: EpisodeInfo[] }>(`/api/anime/${malId}/episodes`),
+  getEpisodes: (anidbId: number) =>
+    fetchApi<{ anidb_id: number; total: number; episodes: EpisodeInfo[] }>(`/api/anime/${anidbId}/episodes`),
 
   // Schedule
   getSchedule: (day?: string) =>

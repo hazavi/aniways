@@ -1,28 +1,23 @@
 """
-MAL Routes
-==========
+Catalogue Routes
+================
 
-MyAnimeList data via the official MAL v2 API.
+AniDB anime records with AniList discovery.
 """
 
-import logging
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 
-from app.scrapers.mal import (
-    browse_anime,
-    scrape_anime_details,
-    scrape_characters,
-    scrape_recommendations,
-    scrape_schedule,
-    scrape_seasonal_anime,
-    scrape_seasonal_anime_page,
-    scrape_next_season,
-    scrape_top_anime,
-    search_anime,
-)
+from app.scrapers import anidb
 
-logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["MAL"])
+router = APIRouter(prefix="/api", tags=["Catalogue"])
+
+
+@router.post("/ids/legacy")
+async def migrate_legacy_ids(ids: list[int] = Body(...)):
+    """Resolve IDs in watch histories written by older app versions."""
+    if len(ids) > 500 or any(anime_id < 1 for anime_id in ids):
+        raise HTTPException(400, "Expected up to 500 positive IDs")
+    return {"data": await anidb.legacy_ids_to_anidb(ids)}
 
 
 # Top Anime
@@ -34,7 +29,7 @@ async def get_top_anime(
     type: str = Query(None),
 ):
     """Get top anime by filter (airing, upcoming, bypopularity, favorite)."""
-    return await scrape_top_anime(filter, min(limit, 50), type, page)
+    return await anidb.top_anime(filter, min(limit, 50), type, page)
 
 
 # Browse
@@ -47,28 +42,28 @@ async def get_browse_anime(
     limit: int = Query(25, ge=1, le=25),
 ):
     """Browse anime with filters and sorting."""
-    return await browse_anime(status, order_by, sort, page, limit)
+    return await anidb.browse_anime(status, order_by, sort, page, limit)
 
 
 # Anime Details
-@router.get("/anime/{mal_id}")
-async def get_anime(mal_id: int):
-    """Get anime details by MAL ID."""
-    if data := await scrape_anime_details(mal_id):
+@router.get("/anime/{anidb_id}")
+async def get_anime(anidb_id: int):
+    """Get anime details by AniDB ID."""
+    if data := await anidb.anime_details(anidb_id):
         return {"data": data}
-    raise HTTPException(404, f"Anime {mal_id} not found")
+    raise HTTPException(404, f"Anime {anidb_id} not found")
 
 
-@router.get("/anime/{mal_id}/recommendations")
-async def get_recommendations(mal_id: int, limit: int = Query(12, ge=1, le=50)):
+@router.get("/anime/{anidb_id}/recommendations")
+async def get_recommendations(anidb_id: int, limit: int = Query(12, ge=1, le=50)):
     """Get anime recommendations."""
-    return {"data": await scrape_recommendations(mal_id, limit)}
+    return {"data": await anidb.recommendations(anidb_id, limit)}
 
 
-@router.get("/anime/{mal_id}/characters")
-async def get_characters(mal_id: int, limit: int = Query(12, ge=1, le=50)):
+@router.get("/anime/{anidb_id}/characters")
+async def get_characters(anidb_id: int, limit: int = Query(12, ge=1, le=50)):
     """Get anime characters with voice actors."""
-    return {"data": await scrape_characters(mal_id, limit)}
+    return {"data": []}
 
 
 # Search
@@ -79,7 +74,7 @@ async def search(
     limit: int = Query(25, ge=1, le=25),
 ):
     """Search anime by query."""
-    data, total_pages = await search_anime(q, page, limit)
+    data, total_pages = await anidb.search_anime(q, page, limit)
     return {
         "data": data,
         "pagination": {"last_visible_page": total_pages, "has_next_page": page < total_pages},
@@ -90,21 +85,23 @@ async def search(
 @router.get("/seasons/now")
 async def get_current_season(page: int = Query(1, ge=1), limit: int = Query(25, ge=1, le=50)):
     """Get current season anime."""
-    return await scrape_seasonal_anime_page(page=page, limit=limit)
+    year, season = anidb.season_now()
+    return await anidb.seasonal_anime(year, season, page, limit)
 
 
 @router.get("/seasons/upcoming")
 async def get_upcoming(page: int = Query(1, ge=1), limit: int = Query(25, ge=1, le=50)):
     """Get anime from the next calendar season."""
-    return await scrape_next_season(page, limit)
+    year, season = anidb.season_next()
+    return await anidb.seasonal_anime(year, season, page, limit)
 
 
 @router.get("/seasons/{year}/{season}")
-async def get_season(year: int, season: str, limit: int = Query(25, ge=1, le=50)):
+async def get_season(year: int, season: str, page: int = Query(1, ge=1), limit: int = Query(25, ge=1, le=50)):
     """Get anime by season (winter, spring, summer, fall)."""
     if season.lower() not in ("winter", "spring", "summer", "fall"):
         raise HTTPException(400, "Invalid season")
-    return {"data": await scrape_seasonal_anime(year, season, limit)}
+    return await anidb.seasonal_anime(year, season, page, limit)
 
 
 # Schedule
@@ -115,5 +112,5 @@ async def get_schedule(filter: str = Query(None), page: int = Query(1, ge=1)):
     if filter and filter.lower() not in valid:
         raise HTTPException(400, f"Filter must be one of: {', '.join(valid)}")
 
-    data = await scrape_schedule(filter.lower() if filter else None, page)
+    data = await anidb.schedule(filter.lower() if filter else None, page)
     return {"data": data, "pagination": {"has_next_page": len(data) >= 25}}

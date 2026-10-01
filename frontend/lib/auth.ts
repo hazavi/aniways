@@ -78,8 +78,8 @@ export const listApi = {
     return res.json();
   },
 
-  checkAnime: async (malId: number): Promise<{ in_list: boolean; item: AnimeListItem | null }> => {
-    const res = await fetch(`${API_URL}/api/list/check/${malId}`, {
+  checkAnime: async (anidbId: number): Promise<{ in_list: boolean; item: AnimeListItem | null }> => {
+    const res = await fetch(`${API_URL}/api/list/check/${anidbId}`, {
       headers: getAuthHeader(),
     });
     if (!res.ok) return { in_list: false, item: null };
@@ -87,7 +87,7 @@ export const listApi = {
   },
 
   addToList: async (data: {
-    mal_id: number;
+    anidb_id: number;
     title: string;
     title_english?: string;
     image_url?: string;
@@ -109,13 +109,13 @@ export const listApi = {
     return res.json();
   },
 
-  updateListItem: async (malId: number, data: {
+  updateListItem: async (anidbId: number, data: {
     status?: ListStatus;
     episodes_watched?: number;
     score?: number;
     notes?: string;
   }): Promise<AnimeListItem> => {
-    const res = await fetch(`${API_URL}/api/list/${malId}`, {
+    const res = await fetch(`${API_URL}/api/list/${anidbId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -127,8 +127,8 @@ export const listApi = {
     return res.json();
   },
 
-  removeFromList: async (malId: number): Promise<void> => {
-    const res = await fetch(`${API_URL}/api/list/${malId}`, {
+  removeFromList: async (anidbId: number): Promise<void> => {
+    const res = await fetch(`${API_URL}/api/list/${anidbId}`, {
       method: "DELETE",
       headers: getAuthHeader(),
     });
@@ -136,14 +136,14 @@ export const listApi = {
   },
 
   quickAdd: async (
-    malId: number,
+    anidbId: number,
     status: ListStatus,
     title: string,
     titleEnglish?: string,
     imageUrl?: string,
     totalEpisodes?: number
   ): Promise<AnimeListItem> => {
-    const url = new URL(`${API_URL}/api/list/quick-add/${malId}/${status}`);
+    const url = new URL(`${API_URL}/api/list/quick-add/${anidbId}/${status}`);
     url.searchParams.set("title", title);
     if (titleEnglish) url.searchParams.set("title_english", titleEnglish);
     if (imageUrl) url.searchParams.set("image_url", imageUrl);

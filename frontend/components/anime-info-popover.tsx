@@ -17,7 +17,7 @@ import { Play, Info, Star } from "lucide-react";
 import { AddToListButton } from "@/components/add-to-list-button";
 
 interface AnimeData {
-  mal_id: number;
+  anidb_id: number;
   title: string;
   title_english?: string;
   title_japanese?: string;
@@ -29,7 +29,7 @@ interface AnimeData {
   duration?: string;
   episodes?: number;
   aired?: { string?: string; from?: string; to?: string };
-  genres?: { mal_id: number; name: string }[];
+  genres?: { id: number; name: string }[];
   images?: {
     jpg: {
       image_url?: string;
@@ -68,7 +68,7 @@ export function AnimeInfoPopover({
     if (open && needsFetch && !fetched && !loading) {
       setLoading(true);
       try {
-        const res = await api.getAnime(initialAnime.mal_id);
+        const res = await api.getAnime(initialAnime.anidb_id);
         setAnime(res.data);
         setFetched(true);
       } catch (error) {
@@ -87,7 +87,7 @@ export function AnimeInfoPopover({
       : null);
 
   const title = getTitle(anime);
-  const detailsUrl = `/anime/${anime.mal_id}`;
+  const detailsUrl = `/anime/${anime.anidb_id}`;
   const linkUrl = watchUrl || detailsUrl;
 
   return (
@@ -187,7 +187,7 @@ export function AnimeInfoPopover({
                       <span className="text-sm">Genres: </span>
                       {anime.genres.map((g, index) => (
                         <span
-                          key={`${g.mal_id ?? g.name}-${index}`}
+                          key={`${g.id ?? g.name}-${index}`}
                           className="text-white font-medium bg-black/100 px-1.5 py-0.5 rounded-lg text-xs"
                         >
                           {g.name}
@@ -223,7 +223,7 @@ export function AnimeInfoPopover({
             {/* Add to List Button */}
             {user && (
               <AddToListButton
-                malId={initialAnime.mal_id}
+                anidbId={initialAnime.anidb_id}
                 title={initialAnime.title}
                 titleEnglish={initialAnime.title_english}
                 imageUrl={

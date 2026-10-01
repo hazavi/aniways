@@ -41,7 +41,7 @@ class UserProfile(BaseModel):
 
 # Anime List Schemas
 class AnimeListItemCreate(BaseModel):
-    mal_id: int
+    anidb_id: int
     title: str
     title_english: Optional[str] = None
     image_url: Optional[str] = None
@@ -61,7 +61,7 @@ class AnimeListItemUpdate(BaseModel):
 
 class AnimeListItemResponse(BaseModel):
     id: int
-    mal_id: int
+    anidb_id: int
     title: str
     title_english: Optional[str] = None
     image_url: Optional[str] = None

@@ -10,7 +10,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface AnimeRecommendation {
-  mal_id: number;
+  anidb_id: number;
   title: string;
   title_english?: string;
   images: Anime["images"];
@@ -18,19 +18,19 @@ export interface AnimeRecommendation {
 }
 
 export interface AnimeCharacter {
-  mal_id: number;
+  anidb_id: number;
   name: string;
   images: { jpg?: { image_url?: string } };
   role: string;
   voice_actor?: {
-    mal_id: number;
+    anidb_id: number;
     name: string;
     images: { jpg?: { image_url?: string } };
   } | null;
 }
 
 export interface EpisodesResponse {
-  mal_id: number;
+  anidb_id: number;
   total: number;
   episodes: EpisodeInfo[];
 }

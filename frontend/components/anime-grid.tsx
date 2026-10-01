@@ -30,7 +30,7 @@ export function AnimeGrid({
       >
         {animeList.map((item, index) => (
           <AnimeCard
-            key={`${item.mal_id}-${index}`}
+            key={`${item.anidb_id}-${index}`}
             anime={item}
             compact={compact}
             hideDuration={hideDuration}

@@ -29,7 +29,7 @@ export function AnimeCard({
     <Card className="group overflow-hidden border-0 bg-transparent gap-0 py-2 shadow-none transition-transform hover:scale-105">
       <CardContent className="p-0">
         <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
-          <Link href={`/anime/${anime.mal_id}`}>
+          <Link href={`/anime/${anime.anidb_id}`}>
             <Image
               src={
                 anime.images.jpg.large_image_url || anime.images.jpg.image_url
@@ -85,7 +85,7 @@ export function AnimeCard({
             </div>
           )}
         </div>
-        <Link href={`/anime/${anime.mal_id}`}>
+        <Link href={`/anime/${anime.anidb_id}`}>
           <div className={compact ? "mt-1.5" : "mt-2"}>
             <h3
               className={
