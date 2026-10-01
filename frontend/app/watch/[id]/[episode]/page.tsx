@@ -780,7 +780,7 @@ export default function WatchPage({ params }: WatchPageProps) {
           {episodeListView === "list" && (
             <ScrollArea
               className="w-full"
-              style={{ height: `${Math.max(1, Math.min(6, getEpisodesInRange().length)) * 88 + 4}px` }}
+              style={{ height: `${Math.max(1, Math.min(5, getEpisodesInRange().length)) * 88 + 4}px` }}
             >
               <div className="flex flex-col gap-2 px-1.5 py-1.5 pr-3">
                 {(episodeSort === "asc"
@@ -846,12 +846,12 @@ export default function WatchPage({ params }: WatchPageProps) {
         <section className={`min-w-0 ${isExpanded ? "order-2 lg:col-start-1 lg:row-start-2" : "order-3 pt-6 lg:col-start-1 lg:row-start-2"}`}>
           <div className="min-w-0 space-y-4">
             <div className="flex items-start gap-4">
-              <div className="relative h-44 w-32 shrink-0 overflow-hidden rounded-md bg-muted">
+              <div className="relative h-50 w-38 shrink-0 overflow-hidden rounded-md bg-muted">
                 <Image
                   src={anime.images.jpg.large_image_url || anime.images.jpg.image_url}
                   alt={getTitle(anime)}
                   fill
-                  sizes="128px"
+                  sizes="148px"
                   className="object-cover"
                 />
               </div>
@@ -866,7 +866,7 @@ export default function WatchPage({ params }: WatchPageProps) {
                   {anime.year && <span>{anime.year}</span>}
                   {!!anime.episodes && <span>{anime.episodes} episodes</span>}
                 </div>
-                <div className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+                <div className="grid gap-y-1 text-xs">
                   {anime.season && anime.year && <span>Season: {anime.season.charAt(0).toUpperCase() + anime.season.slice(1)} {anime.year}</span>}
                   {anime.duration && <span>Duration: {anime.duration.replace(" per ep", "")}</span>}
                   {anime.score && <span>AniList Score: {anime.score.toFixed(2)}</span>}
@@ -969,7 +969,7 @@ function WatchSkeleton() {
           </div>
           <Skeleton className="h-8 w-full" />
           <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
@@ -977,7 +977,7 @@ function WatchSkeleton() {
       </div>
       <div className="grid gap-6 pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,25rem)]">
         <div className="flex gap-4">
-          <Skeleton className="h-44 w-32 shrink-0" />
+          <Skeleton className="h-48 w-36 shrink-0" />
           <div className="flex-1 space-y-3">
             <Skeleton className="h-6 w-1/2" />
             <Skeleton className="h-4 w-3/4" />
