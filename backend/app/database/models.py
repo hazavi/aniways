@@ -33,19 +33,20 @@ class User(Base):
 
 
 class AnimeListItem(Base):
-    __tablename__ = "anime_list_items"
+    __tablename__ = "anime_list_items_v2"
     __table_args__ = (
         # Composite unique constraint: one anime per user
-        UniqueConstraint("user_id", "mal_id", name="uq_user_anime"),
+        UniqueConstraint("user_id", "anidb_id", name="uq_user_anidb_anime"),
         # Composite index for filtering by user and status (common query)
-        Index("ix_user_status", "user_id", "status"),
+        Index("ix_anidb_user_status", "user_id", "status"),
         # Index for sorting by updated_at (recent activity)
-        Index("ix_user_updated", "user_id", "updated_at"),
+        Index("ix_anidb_user_updated", "user_id", "updated_at"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    mal_id = Column(Integer, nullable=False, index=True)
+    anidb_id = Column(Integer, nullable=False, index=True)
+    legacy_id = Column(Integer, unique=True, nullable=True)
     
     # Anime info (cached for quick access)
     title = Column(String(255), nullable=False)
@@ -67,4 +68,4 @@ class AnimeListItem(Base):
     user = relationship("User", back_populates="anime_list")
 
     def __repr__(self):
-        return f"<AnimeListItem(id={self.id}, mal_id={self.mal_id}, title='{self.title}')>"
+        return f"<AnimeListItem(id={self.id}, anidb_id={self.anidb_id}, title='{self.title}')>"

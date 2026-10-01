@@ -64,9 +64,9 @@ async def get_list_stats(
     }
 
 
-@router.get("/check/{mal_id}")
+@router.get("/check/{anidb_id}")
 async def check_anime_in_list(
-    mal_id: int,
+    anidb_id: int,
     current_user: Optional[User] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -77,7 +77,7 @@ async def check_anime_in_list(
     # Uses uq_user_anime unique constraint index
     item = db.query(AnimeListItem).filter(
         AnimeListItem.user_id == current_user.id,
-        AnimeListItem.mal_id == mal_id
+        AnimeListItem.anidb_id == anidb_id
     ).first()
     
     if item:
@@ -99,7 +99,7 @@ async def add_to_list(
     # Check if already in list
     existing = db.query(AnimeListItem).filter(
         AnimeListItem.user_id == current_user.id,
-        AnimeListItem.mal_id == item_data.mal_id
+        AnimeListItem.anidb_id == item_data.anidb_id
     ).first()
     
     if existing:
@@ -111,7 +111,7 @@ async def add_to_list(
     # Create new list item
     new_item = AnimeListItem(
         user_id=current_user.id,
-        mal_id=item_data.mal_id,
+        anidb_id=item_data.anidb_id,
         title=item_data.title,
         title_english=item_data.title_english,
         image_url=item_data.image_url,
@@ -129,9 +129,9 @@ async def add_to_list(
     return AnimeListItemResponse.model_validate(new_item)
 
 
-@router.put("/{mal_id}", response_model=AnimeListItemResponse)
+@router.put("/{anidb_id}", response_model=AnimeListItemResponse)
 async def update_list_item(
-    mal_id: int,
+    anidb_id: int,
     update_data: AnimeListItemUpdate,
     current_user: User = Depends(get_required_user),
     db: Session = Depends(get_db)
@@ -139,7 +139,7 @@ async def update_list_item(
     """Update an anime in user's list"""
     item = db.query(AnimeListItem).filter(
         AnimeListItem.user_id == current_user.id,
-        AnimeListItem.mal_id == mal_id
+        AnimeListItem.anidb_id == anidb_id
     ).first()
     
     if not item:
@@ -164,16 +164,16 @@ async def update_list_item(
     return AnimeListItemResponse.model_validate(item)
 
 
-@router.delete("/{mal_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{anidb_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_from_list(
-    mal_id: int,
+    anidb_id: int,
     current_user: User = Depends(get_required_user),
     db: Session = Depends(get_db)
 ):
     """Remove an anime from user's list"""
     item = db.query(AnimeListItem).filter(
         AnimeListItem.user_id == current_user.id,
-        AnimeListItem.mal_id == mal_id
+        AnimeListItem.anidb_id == anidb_id
     ).first()
     
     if not item:
@@ -188,9 +188,9 @@ async def remove_from_list(
     return None
 
 
-@router.post("/quick-add/{mal_id}/{status_value}", response_model=AnimeListItemResponse)
+@router.post("/quick-add/{anidb_id}/{status_value}", response_model=AnimeListItemResponse)
 async def quick_add_to_list(
-    mal_id: int,
+    anidb_id: int,
     status_value: ListStatus,
     title: str = Query(...),
     title_english: Optional[str] = Query(None),
@@ -203,7 +203,7 @@ async def quick_add_to_list(
     # Check if already in list
     existing = db.query(AnimeListItem).filter(
         AnimeListItem.user_id == current_user.id,
-        AnimeListItem.mal_id == mal_id
+        AnimeListItem.anidb_id == anidb_id
     ).first()
     
     if existing:
@@ -216,7 +216,7 @@ async def quick_add_to_list(
     # Create new list item
     new_item = AnimeListItem(
         user_id=current_user.id,
-        mal_id=mal_id,
+        anidb_id=anidb_id,
         title=title,
         title_english=title_english,
         image_url=image_url,

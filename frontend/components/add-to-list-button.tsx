@@ -8,7 +8,7 @@ import { Plus, Check, Loader2, Clock, Eye, Pause, XCircle } from "lucide-react";
 import Link from "next/link";
 
 interface AddToListButtonProps {
-  malId: number;
+  anidbId: number;
   title: string;
   titleEnglish?: string;
   imageUrl?: string;
@@ -27,7 +27,7 @@ export const statusIcons: Record<ListStatus, React.ReactNode> = {
 };
 
 export function AddToListButton({
-  malId,
+  anidbId,
   title,
   titleEnglish,
   imageUrl,
@@ -46,11 +46,11 @@ export function AddToListButton({
     } else {
       setIsChecking(false);
     }
-  }, [isAuthenticated, malId]);
+  }, [isAuthenticated, anidbId]);
 
   const checkIfInList = async () => {
     try {
-      const result = await listApi.checkAnime(malId);
+      const result = await listApi.checkAnime(anidbId);
       setListItem(result.item);
     } catch (error) {
       console.error("Failed to check list:", error);
@@ -65,7 +65,7 @@ export function AddToListButton({
     setIsLoading(true);
     try {
       const result = await listApi.quickAdd(
-        malId,
+        anidbId,
         status,
         title,
         titleEnglish,

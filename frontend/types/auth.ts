@@ -35,7 +35,7 @@ export type ListStatus =
 
 export interface AnimeListItem {
   id: number;
-  mal_id: number;
+  anidb_id: number;
   title: string;
   title_english?: string;
   image_url?: string;

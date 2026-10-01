@@ -6,6 +6,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { Navbar } from "@/components/navbar";
 import { TitleBar } from "@/components/title-bar";
 import { ScrollToTop } from "@/components/scroll-to-top";
+import { WatchHistoryMigration } from "@/components/watch-history-migration";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -51,6 +52,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <LanguageProvider>
+              <WatchHistoryMigration />
               <TitleBar />
               <div className="h-screen flex flex-col electron-app">
                 <div className="flex-1 overflow-y-auto">

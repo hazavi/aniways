@@ -40,7 +40,7 @@ This project is for educational and personal use only.
 
 ## Overview
 
-Aniways provides anime metadata from the official MyAnimeList v2 API and episode streams from AnimeX. The backend handles data fetching and caching while the frontend delivers a responsive viewing experience.
+Aniways provides anime metadata from AniDB and episode streams from AnimeX. AniList supplies ranked and seasonal discovery, while the backend handles data fetching and caching.
 
 ### Features
 
@@ -63,10 +63,10 @@ aniways/
 │       ├── main.py            # FastAPI application
 │       ├── core/             # Configuration and shared HTTP client
 │       ├── routes/
-│       │   ├── mal.py         # MyAnimeList endpoints
+│       │   ├── catalogue.py   # AniDB catalogue endpoints
 │       │   └── watch.py       # Video source endpoints
 │       └── scrapers/
-│           ├── mal.py         # Official MyAnimeList v2 client
+│           ├── anidb.py       # AniDB catalogue client
 │           └── animex.py      # AnimeX episode servers
 │
 ├── desktop/
@@ -112,7 +112,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` and set `MAL_CLIENT_ID` to your MyAnimeList API client ID.
+The catalogue needs no API client ID. Copy `backend/.env.example` to `backend/.env` only if you want to change local server settings. Anime links and saved lists use AniDB IDs. On upgrade, saved lists and browser watch history are migrated using public ID mappings; old saved-list rows remain in SQLite as a backup.
 
 ### Run
 
@@ -148,7 +148,7 @@ Server runs at `http://localhost:4444`
 
 ### AnimeX Playback
 
-Aniways maps MyAnimeList IDs to AnimeX through AniList. The watch route returns available Sub and Dub servers for an episode. The frontend serves the AnimeX player at `/animex-player/` so it can display inside the watch page.
+Aniways maps AniDB IDs to AnimeX through AniList. The watch route returns available Sub and Dub servers for an episode. The frontend serves the AnimeX player at `/animex-player/` so it can display inside the watch page.
 
 ---
 
@@ -206,9 +206,9 @@ npm start
 - FastAPI - Web framework
 - SQLAlchemy - ORM with SQLite database
 - httpx - Async HTTP client
-- MyAnimeList v2 API - Anime catalogue data
+- AniDB data via animap.id - Anime catalogue details
 - AnimeX - Episode streams
-- AniList - Catalogue ID mapping for playback
+- AniList - Rankings, seasons, search discovery, and playback ID mapping
 - JWT - User authentication
 
 ### Frontend

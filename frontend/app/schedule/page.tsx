@@ -51,7 +51,7 @@ function ScheduleCard({
   const title = getTitle(anime);
 
   return (
-    <Link href={`/anime/${anime.mal_id}`} className="group block">
+    <Link href={`/anime/${anime.anidb_id}`} className="group block">
       <div className="flex gap-3 p-2 rounded-xl hover:bg-white/5 transition-all duration-200">
         <div className="relative w-12 h-16 flex-shrink-0 overflow-hidden rounded-lg shadow-md">
           <Image
@@ -157,8 +157,8 @@ export default function SchedulePage() {
     const seen = new Set<number>();
     return [...anime]
       .filter((a) => {
-        if (seen.has(a.mal_id)) return false;
-        seen.add(a.mal_id);
+        if (seen.has(a.anidb_id)) return false;
+        seen.add(a.anidb_id);
         return true;
       })
       .sort((a, b) => {
@@ -227,7 +227,7 @@ export default function SchedulePage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-1">
               {sortedSchedule(activeDay).map((anime) => (
                 <ScheduleCard
-                  key={anime.mal_id}
+                  key={anime.anidb_id}
                   anime={anime}
                   getTitle={getTitle}
                 />

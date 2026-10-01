@@ -8,11 +8,15 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "cdn.myanimelist.net",
+        hostname: "artworks.thetvdb.com",
       },
       {
         protocol: "https",
-        hostname: "artworks.thetvdb.com",
+        hostname: "cdn.anidb.net",
+      },
+      {
+        protocol: "https",
+        hostname: "s4.anilist.co",
       },
     ],
   },

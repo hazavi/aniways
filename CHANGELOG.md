@@ -7,11 +7,12 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - AnimeX Sub and Dub server choices with in-player quality, subtitle, and playback settings.
+- AniDB catalogue with AniDB IDs and no API client ID.
 
 ### Changed
 
-- Catalogue data uses the official MyAnimeList v2 API; episode streams and availability use AnimeX.
-- The homepage shows MyAnimeList's airing list in place of the former release feed.
+- Catalogue details use AniDB records; AniList supplies discovery, and AnimeX supplies episode streams.
+- The homepage shows popular airing anime in place of the former release feed.
 
 ### Removed
 

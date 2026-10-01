@@ -1,4 +1,4 @@
-"""Resolve AnimeX episode embeds from a MyAnimeList ID."""
+"""Resolve AnimeX episode embeds from an AniDB ID."""
 
 import html
 import logging
@@ -9,18 +9,19 @@ from urllib.parse import urlencode, urlparse
 from app.core.config import settings
 from app.core.dependencies import get_client
 from app.utils import cache
+from app.scrapers.anidb import get_anilist_id
 
 logger = logging.getLogger(__name__)
 
 _MEDIA_QUERY = """query ($id: Int) {
-  Media(idMal: $id, type: ANIME) {
+  Media(id: $id, type: ANIME) {
     id
     episodes
     title { english romaji }
   }
 }"""
 _PLAYER_URL = re.compile(r'player_url\s*:\s*"([^"]+)"')
-_MEDIA_SLUG = re.compile(r'\bslug:"([a-z0-9-]+)",idMal:')
+_MEDIA_SLUG = re.compile(r'\bslug:"([a-z0-9-]+)",')
 _SERVER_ID = re.compile(r"^[a-z0-9-]{1,32}$")
 
 
@@ -30,16 +31,19 @@ def _slug(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ascii_title.lower()).strip("-") or "anime"
 
 
-async def get_media(mal_id: int) -> dict | None:
-    """Map a MAL ID to the AniList ID used by AnimeX."""
-    key = f"animex:media:{mal_id}"
+async def get_media(anidb_id: int) -> dict | None:
+    """Map an AniDB ID to the AniList ID used by AnimeX."""
+    key = f"animex:media:{anidb_id}"
     if cached := cache.get(key, settings.CACHE_TTL_LONG):
         return cached
 
+    anilist_id = await get_anilist_id(anidb_id)
+    if not anilist_id:
+        return None
     try:
         response = await get_client().post(
             "https://graphql.anilist.co",
-            json={"query": _MEDIA_QUERY, "variables": {"id": mal_id}},
+            json={"query": _MEDIA_QUERY, "variables": {"id": anilist_id}},
         )
         response.raise_for_status()
         media = (response.json().get("data") or {}).get("Media")
@@ -47,13 +51,13 @@ async def get_media(mal_id: int) -> dict | None:
             cache.set(key, media)
             return media
     except Exception as exc:
-        logger.warning("AnimeX ID lookup failed for MAL %s: %s", mal_id, exc)
+        logger.warning("AnimeX ID lookup failed for AniDB %s: %s", anidb_id, exc)
     return None
 
 
-async def get_animex_episodes(mal_id: int, media: dict) -> list[dict]:
-    """Read AnimeX's numbered episode metadata for a MAL anime."""
-    key = f"animex:episodes:{mal_id}"
+async def get_animex_episodes(anidb_id: int, media: dict) -> list[dict]:
+    """Read AnimeX's numbered episode metadata for an AniDB anime."""
+    key = f"animex:episodes:{anidb_id}"
     if cached := cache.get(key, settings.CACHE_TTL_LONG):
         return cached
 
@@ -89,7 +93,7 @@ async def get_animex_episodes(mal_id: int, media: dict) -> list[dict]:
             if not isinstance(titles, dict):
                 titles = {}
             found[number] = {
-                "mal_id": mal_id,
+                "anidb_id": anidb_id,
                 "episode": number,
                 "title": titles.get("en") or None,
                 "title_japanese": titles.get("ja") or None,
@@ -106,7 +110,7 @@ async def get_animex_episodes(mal_id: int, media: dict) -> list[dict]:
 
         count = max(media.get("episodes") or 0, max(found, default=0))
         episodes = [found.get(number) or {
-            "mal_id": mal_id, "episode": number, "title": None,
+            "anidb_id": anidb_id, "episode": number, "title": None,
             "title_japanese": None, "title_romanji": None, "aired": None,
             "filler": False, "recap": False,
             "has_sub": False, "has_dub": False, "image": None,
@@ -116,7 +120,7 @@ async def get_animex_episodes(mal_id: int, media: dict) -> list[dict]:
             cache.set(key, episodes)
         return episodes
     except Exception as exc:
-        logger.warning("AnimeX episode metadata failed for MAL %s: %s", mal_id, exc)
+        logger.warning("AnimeX episode metadata failed for AniDB %s: %s", anidb_id, exc)
         return []
 
 

@@ -68,10 +68,10 @@ export function Navbar() {
       setIsSearching(true);
       try {
         const res = await api.searchAnime(query, 1);
-        // Deduplicate by mal_id to avoid duplicate key errors
+        // Deduplicate by anidb_id to avoid duplicate key errors
         const unique = res.data?.filter(
           (anime: Anime, index: number, self: Anime[]) =>
-            index === self.findIndex((a) => a.mal_id === anime.mal_id),
+            index === self.findIndex((a) => a.anidb_id === anime.anidb_id),
         );
         setSuggestions(unique?.slice(0, 6) || []);
       } catch (error) {
@@ -111,7 +111,7 @@ export function Navbar() {
     setShowSuggestions(false);
     setQuery("");
     setMobileSearchOpen(false);
-    router.push(`/anime/${anime.mal_id}`);
+    router.push(`/anime/${anime.anidb_id}`);
   };
 
   // Close mobile menu on route change
@@ -216,7 +216,7 @@ export function Navbar() {
                   <>
                     {suggestions.map((anime) => (
                       <button
-                        key={anime.mal_id}
+                        key={anime.anidb_id}
                         onClick={() => handleSuggestionClick(anime)}
                         className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-accent/50 transition-colors text-left hover:cursor-pointer"
                       >
@@ -364,7 +364,7 @@ export function Navbar() {
                 ) : suggestions.length > 0 ? (
                   suggestions.map((anime) => (
                     <button
-                      key={anime.mal_id}
+                      key={anime.anidb_id}
                       onClick={() => handleSuggestionClick(anime)}
                       className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                     >

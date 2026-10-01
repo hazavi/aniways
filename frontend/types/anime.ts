@@ -1,7 +1,7 @@
 // Anime-related types
 
 export interface Anime {
-  mal_id: number;
+  anidb_id: number;
   title: string;
   title_english?: string;
   title_japanese?: string;
@@ -31,17 +31,17 @@ export interface Anime {
   };
   season?: string;
   year?: number;
-  studios?: { mal_id: number; name: string }[];
-  producers?: { mal_id: number; name: string }[];
-  licensors?: { mal_id: number; name: string }[];
-  genres?: { mal_id: number; name: string }[];
-  themes?: { mal_id: number; name: string }[];
-  demographics?: { mal_id: number; name: string }[];
+  studios?: { id: number; name: string }[];
+  producers?: { id: number; name: string }[];
+  licensors?: { id: number; name: string }[];
+  genres?: { id: number; name: string }[];
+  themes?: { id: number; name: string }[];
+  demographics?: { id: number; name: string }[];
   type?: string;
   airing?: boolean;
   relations?: {
     relation: string;
-    entry: { mal_id: number; type: string; name: string; url: string; image?: string }[];
+    entry: { anidb_id: number; type: string; name: string; url: string; image?: string }[];
   }[];
 }
 
@@ -77,7 +77,7 @@ export interface EpisodeInfo {
 }
 
 export interface WatchResponse {
-  mal_id: number;
+  anidb_id: number;
   title: string;
   episode: number;
   total_episodes?: number;

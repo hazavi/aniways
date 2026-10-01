@@ -1,3 +1,3 @@
 """Scrapers Package"""
 
-"""MAL catalogue and AnimeX stream providers."""
+"""AniDB catalogue and AnimeX stream providers."""

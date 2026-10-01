@@ -17,10 +17,11 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.dependencies import init_dependencies, cleanup_dependencies
-from app.routes import watch, mal
+from app.routes import watch, catalogue
 from app.routes import auth as auth_routes
 from app.routes import animelist as list_routes
 from app.database import engine, Base
+from app.database.migration import migrate_saved_list
 
 # Logging
 logging.basicConfig(
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI):
 
     client = httpx.AsyncClient(timeout=settings.HTTP_TIMEOUT)
     init_dependencies(client)
+    await migrate_saved_list()
 
     logger.info("✔️  Application ready")
 
@@ -79,7 +81,7 @@ def create_app() -> FastAPI:
         )
 
     # Routes
-    app.include_router(mal.router)
+    app.include_router(catalogue.router)
     app.include_router(watch.router)
     app.include_router(auth_routes.router)
     app.include_router(list_routes.router)
@@ -94,7 +96,7 @@ def create_app() -> FastAPI:
                 "anime": "/api/anime/{id}",
                 "search": "/api/anime?q=...",
                 "top": "/api/top/anime",
-                "watch": "/api/watch/{mal_id}/{episode}",
+                "watch": "/api/watch/{anidb_id}/{episode}",
                 "auth": "/api/auth/login",
                 "list": "/api/list",
             },

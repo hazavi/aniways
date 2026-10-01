@@ -6,7 +6,7 @@ Electron-based desktop application for Aniways.
 
 This folder contains the Electron wrapper that packages the Aniways frontend and backend into a standalone desktop application for Windows.
 
-The bundled backend reads anime data from the official MyAnimeList v2 API and episode streams from AnimeX.
+The bundled backend reads AniDB catalogue records through animap.id and uses AniList for discovery and AnimeX playback mapping. No catalogue client ID is required.
 
 ## Files
 

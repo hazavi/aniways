@@ -26,7 +26,7 @@ interface AnimeDetailPageProps {
 }
 
 interface Recommendation {
-  mal_id: number;
+  anidb_id: number;
   title: string;
   title_english?: string;
   images: Anime["images"];
@@ -34,12 +34,12 @@ interface Recommendation {
 }
 
 interface Character {
-  mal_id: number;
+  anidb_id: number;
   name: string;
   images: { jpg?: { image_url?: string } };
   role: string;
   voice_actor?: {
-    mal_id: number;
+    anidb_id: number;
     name: string;
     images: { jpg?: { image_url?: string } };
   } | null;
@@ -232,7 +232,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
               </Button>
             )}
             <AddToListButton
-              malId={anime.mal_id}
+              anidbId={anime.anidb_id}
               title={anime.title}
               titleEnglish={anime.title_english}
               imageUrl={
@@ -301,7 +301,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
               <div className="flex flex-wrap gap-1.5 pt-2">
                 {anime.genres.map((genre, index) => (
                   <Badge
-                    key={`genre-${genre.mal_id ?? genre.name}-${index}`}
+                    key={`genre-${genre.id ?? genre.name}-${index}`}
                     variant="outline"
                     className="text-xs"
                   >
@@ -363,9 +363,9 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
             />
           )}
 
-          {/* MAL Score */}
+          {/* AniList Score */}
           <InfoRow
-            label="MAL Score"
+            label="AniList Score"
             value={anime.score ? anime.score.toFixed(2) : "?"}
           />
 
@@ -376,7 +376,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
               <div className="flex flex-wrap gap-1.5">
                 {anime.genres.map((genre, index) => (
                   <Badge
-                    key={`genre-${genre.mal_id ?? genre.name}-${index}`}
+                    key={`genre-${genre.id ?? genre.name}-${index}`}
                     variant="outline"
                     className="text-xs"
                   >
@@ -385,7 +385,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
                 ))}
                 {anime.demographics?.map((demo, index) => (
                   <Badge
-                    key={`demographic-${demo.mal_id ?? demo.name}-${index}`}
+                    key={`demographic-${demo.id ?? demo.name}-${index}`}
                     variant="outline"
                     className="text-xs"
                   >
@@ -464,8 +464,8 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                       {visibleRels.map((entry) => (
                         <Link
-                          key={entry.mal_id}
-                          href={`/anime/${entry.mal_id}`}
+                          key={entry.anidb_id}
+                          href={`/anime/${entry.anidb_id}`}
                           className="group flex items-center justify-between gap-2 p-2.5 rounded-md bg-muted/50 hover:bg-muted transition-colors"
                         >
                           <div className="min-w-0 space-y-1">
@@ -538,7 +538,7 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                       {visibleChars.map((char) => (
                         <div
-                          key={char.mal_id}
+                          key={char.anidb_id}
                           className="flex gap-2 p-2 rounded-md bg-muted/50"
                         >
                           {/* Character image */}
@@ -629,10 +629,10 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-4">
               {recommendations.slice(0, 16).map((rec) => (
-                <div key={rec.mal_id} className="group mt-2">
+                <div key={rec.anidb_id} className="group mt-2">
                   <div className="overflow-hidden transition-transform hover:scale-105">
                     <div className="relative aspect-[3/4] overflow-hidden rounded-lg">
-                      <Link href={`/anime/${rec.mal_id}`}>
+                      <Link href={`/anime/${rec.anidb_id}`}>
                         <Image
                           src={
                             rec.images.jpg?.large_image_url ||
@@ -653,14 +653,14 @@ export default function AnimeDetailPage({ params }: AnimeDetailPageProps) {
                       {/* Info button with hover popup */}
                       <AnimeInfoPopover
                         anime={{
-                          mal_id: rec.mal_id,
+                          anidb_id: rec.anidb_id,
                           title: rec.title,
                           title_english: rec.title_english,
                         }}
                         compact
                       />
                     </div>
-                    <Link href={`/anime/${rec.mal_id}`}>
+                    <Link href={`/anime/${rec.anidb_id}`}>
                       <div className="mt-1.5">
                         <h3 className="line-clamp-1 text-xs font-medium leading-tight group-hover:text-primary transition-colors">
                           {getTitle(rec)}

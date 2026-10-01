@@ -23,9 +23,13 @@ export function ContinueWatching() {
   const { language } = useLanguage();
 
   useEffect(() => {
-    const items = getWatchHistory();
-    setHistory(items);
-    setIsVisible(items.length > 0);
+    const refresh = () => {
+      const items = getWatchHistory();
+      setHistory(items);
+      setIsVisible(items.length > 0);
+    };
+    refresh();
+    window.addEventListener("aniways-history-migrated", refresh);
     // Load expanded state from localStorage
     const savedState = localStorage.getItem(
       "aniways-continue-watching-expanded",
@@ -33,6 +37,7 @@ export function ContinueWatching() {
     if (savedState !== null) {
       setIsExpanded(savedState === "true");
     }
+    return () => window.removeEventListener("aniways-history-migrated", refresh);
   }, []);
 
   const toggleExpanded = () => {
@@ -82,14 +87,14 @@ export function ContinueWatching() {
 
   const handleRemove = (
     e: React.MouseEvent,
-    malId: number,
+    anidbId: number,
     episode: number,
   ) => {
     e.preventDefault();
     e.stopPropagation();
-    removeFromWatchHistory(malId, episode);
+    removeFromWatchHistory(anidbId, episode);
     setHistory((prev) =>
-      prev.filter((h) => !(h.malId === malId && h.episode === episode)),
+      prev.filter((h) => !(h.anidbId === anidbId && h.episode === episode)),
     );
   };
 
@@ -166,8 +171,8 @@ export function ContinueWatching() {
 
             return (
               <Link
-                key={`${item.malId}-${item.episode}`}
-                href={`/watch/${item.malId}/${item.episode}?t=${item.timestamp}`}
+                key={`${item.anidbId}-${item.episode}`}
+                href={`/watch/${item.anidbId}/${item.episode}?t=${item.timestamp}`}
                 className="group relative flex-shrink-0 w-[calc(50%-6px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(20%-13px)] xl:w-[calc(16.666%-14px)]"
               >
                 {/* Image Container */}
@@ -188,7 +193,7 @@ export function ContinueWatching() {
 
                   {/* Remove button */}
                   <button
-                    onClick={(e) => handleRemove(e, item.malId, item.episode)}
+                    onClick={(e) => handleRemove(e, item.anidbId, item.episode)}
                     className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 hover:bg-destructive flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
                   >
                     <X className="h-3.5 w-3.5 text-white hover:cursor-pointer" />

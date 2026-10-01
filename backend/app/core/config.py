@@ -32,12 +32,9 @@ class Settings:
     # API Info
     API_TITLE: str = "Aniways API"
     API_VERSION: str = "1.6.2"
-    API_DESCRIPTION: str = "Anime streaming API - MyAnimeList v2 + AnimeX"
+    API_DESCRIPTION: str = "Anime streaming API - AniDB catalogue + AnimeX"
 
     # External URLs
-    MAL_BASE_URL: str = "https://api.myanimelist.net/v2"
-    MAL_CLIENT_ID: str = field(default_factory=lambda: _env("MAL_CLIENT_ID", ""))
-
     # Cache TTL (seconds)
     CACHE_TTL_SHORT: int = 300   # 5 min: top, seasonal, search
     CACHE_TTL_LONG: int = 3600   # 1 hour: anime details, episodes
