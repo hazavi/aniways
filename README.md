@@ -1,6 +1,9 @@
-<img width="1584" height="396" alt="Untitled design (2)" src="https://github.com/user-attachments/assets/22ee2675-bff8-48e2-b656-994245aa613a" />
+<img width="1584" height="396" alt="aniways_banner" src="https://github.com/user-attachments/assets/0e4c4a0a-1f8a-45d5-88f6-5909b9fc4a39" />
 
 <div align="center">
+
+
+
 
 # Aniways
 
@@ -16,12 +19,11 @@ A modern anime streaming application built with Next.js, FastAPI and Electron.
 
 ## Preview
 
-https://github.com/user-attachments/assets/0339b4af-6562-42b0-bab2-4c583a4c93f0
+https://github.com/user-attachments/assets/34b68f39-3ed2-4c5f-84d1-0fd97d7f266a
 
-## Quick App Install Tutorial + Preview
+## Quick Desktop App Install Tutorial 
 
-
-https://github.com/user-attachments/assets/9fa3420c-d2b3-4b13-a882-24660d32b33d
+https://github.com/user-attachments/assets/00b1444c-3c87-4002-8231-d7fab8343784
 
 
 
