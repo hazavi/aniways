@@ -262,19 +262,11 @@ chmod +x start.sh
 
 Run as a standalone desktop application:
 
-```bash
-cd frontend
-npm install
-npm run electron:dev
+```bat
+start-electron.bat
 ```
 
-or
-
-```bash
-./start-app.bat
-```
-
-This starts both the Next.js server and the Python backend automatically, then opens the Electron window.
+Run `install-app.bat` first if backend dependencies are not installed. The launcher starts the Next.js frontend if needed, then opens Electron, which starts the backend. `start-app.bat` is an alias for the same launcher.
 
 **Build Desktop App:**
 

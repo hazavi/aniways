@@ -44,17 +44,13 @@ The GitHub Actions workflow:
 
 ## Development
 
-For development, it's recommended to run the frontend and backend separately:
+From the repository root, run:
 
-```bash
-# Terminal 1 - Backend
-cd backend
-python server.py
-
-# Terminal 2 - Frontend
-cd frontend
-npm run dev
+```bat
+start-electron.bat
 ```
+
+The launcher installs missing desktop dependencies, starts the frontend if needed, and opens Electron. Electron starts the backend using the repository's `.venv`. Run `install-app.bat` first if `.venv` is missing.
 
 ## Configuration
 
